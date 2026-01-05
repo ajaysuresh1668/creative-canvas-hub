@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Music, Upload, Play, Pause, Volume2, VolumeX, SkipBack, SkipForward,
-  Scissors, Download, RotateCcw, Rewind, FastForward, Repeat, Shuffle,
-  Settings, SlidersHorizontal, Waves, Radio, Mic, Headphones, ChevronLeft,
-  ChevronRight, Save, Copy, Trash2, Plus, Minus, ZoomIn, ZoomOut
+  Scissors, Download, RotateCcw, Rewind, FastForward, Repeat,
+  Settings, SlidersHorizontal, Waves, Radio, Mic, Headphones,
+  ZoomIn, ZoomOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -31,6 +31,7 @@ const defaultEffects: AudioEffects = {
 
 const AudioEditor: React.FC = () => {
   const [audio, setAudio] = useState<string | null>(null);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(100);
@@ -45,121 +46,177 @@ const AudioEditor: React.FC = () => {
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const [originalFileName, setOriginalFileName] = useState('edited-audio');
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [isAudioLoaded, setIsAudioLoaded] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Handle audio events
   useEffect(() => {
     const audioEl = audioRef.current;
     if (!audioEl) return;
 
-    const updateTime = () => setCurrentTime(audioEl.currentTime);
-    const updateDuration = () => {
+    const handleTimeUpdate = () => {
+      setCurrentTime(audioEl.currentTime);
+    };
+
+    const handleLoadedMetadata = () => {
       setDuration(audioEl.duration);
       setTrimEnd(audioEl.duration);
-    };
-    const handleEnd = () => {
-      if (!isLooping) setIsPlaying(false);
+      setIsAudioLoaded(true);
+      toast.success('Audio ready to edit!');
     };
 
-    audioEl.addEventListener('timeupdate', updateTime);
-    audioEl.addEventListener('loadedmetadata', updateDuration);
-    audioEl.addEventListener('ended', handleEnd);
+    const handleEnded = () => {
+      if (!isLooping) {
+        setIsPlaying(false);
+      }
+    };
+
+    const handleCanPlay = () => {
+      setIsAudioLoaded(true);
+    };
+
+    const handleError = (e: Event) => {
+      console.error('Audio error:', e);
+      toast.error('Error loading audio. Please try a different file.');
+      setIsAudioLoaded(false);
+    };
+
+    audioEl.addEventListener('timeupdate', handleTimeUpdate);
+    audioEl.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audioEl.addEventListener('ended', handleEnded);
+    audioEl.addEventListener('canplay', handleCanPlay);
+    audioEl.addEventListener('error', handleError);
 
     return () => {
-      audioEl.removeEventListener('timeupdate', updateTime);
-      audioEl.removeEventListener('loadedmetadata', updateDuration);
-      audioEl.removeEventListener('ended', handleEnd);
+      audioEl.removeEventListener('timeupdate', handleTimeUpdate);
+      audioEl.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audioEl.removeEventListener('ended', handleEnded);
+      audioEl.removeEventListener('canplay', handleCanPlay);
+      audioEl.removeEventListener('error', handleError);
     };
   }, [audio, isLooping]);
 
-  // Generate fake waveform data for visualization
+  // Generate waveform data when audio loads
   useEffect(() => {
-    if (audio) {
-      const data = Array.from({ length: 150 }, () => Math.random() * 0.8 + 0.2);
+    if (audio && isAudioLoaded) {
+      // Generate more realistic waveform visualization
+      const data = Array.from({ length: 200 }, (_, i) => {
+        const base = Math.random() * 0.6 + 0.2;
+        const wave = Math.sin(i * 0.1) * 0.2;
+        return Math.min(1, Math.max(0.1, base + wave));
+      });
       setWaveformData(data);
     }
-  }, [audio]);
+  }, [audio, isAudioLoaded]);
 
-  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAudioUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('audio/')) {
+        toast.error('Please select a valid audio file');
+        return;
+      }
+      
+      // Validate file size (max 100MB)
+      if (file.size > 100 * 1024 * 1024) {
+        toast.error('File size must be less than 100MB');
+        return;
+      }
+
+      setAudioFile(file);
       setOriginalFileName(file.name.replace(/\.[^/.]+$/, ''));
       const url = URL.createObjectURL(file);
       setAudio(url);
       setEffects(defaultEffects);
-      toast.success('Audio loaded successfully!');
+      setIsAudioLoaded(false);
+      setCurrentTime(0);
+      setIsPlaying(false);
+      toast.info('Loading audio...');
     }
-  };
+  }, []);
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('audio/')) {
+      if (file.size > 100 * 1024 * 1024) {
+        toast.error('File size must be less than 100MB');
+        return;
+      }
+      setAudioFile(file);
       setOriginalFileName(file.name.replace(/\.[^/.]+$/, ''));
       const url = URL.createObjectURL(file);
       setAudio(url);
       setEffects(defaultEffects);
-      toast.success('Audio loaded successfully!');
+      setIsAudioLoaded(false);
+      toast.info('Loading audio...');
+    } else {
+      toast.error('Please drop a valid audio file');
     }
-  };
+  }, []);
 
-  const togglePlay = () => {
-    if (audioRef.current) {
+  const togglePlay = useCallback(() => {
+    if (audioRef.current && isAudioLoaded) {
       if (isPlaying) {
         audioRef.current.pause();
       } else {
-        audioRef.current.play();
+        audioRef.current.play().catch(err => {
+          console.error('Play error:', err);
+          toast.error('Unable to play audio');
+        });
       }
       setIsPlaying(!isPlaying);
     }
-  };
+  }, [isPlaying, isAudioLoaded]);
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.muted = !isMuted;
       setIsMuted(!isMuted);
     }
-  };
+  }, [isMuted]);
 
-  const toggleLoop = () => {
+  const toggleLoop = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.loop = !isLooping;
       setIsLooping(!isLooping);
       toast.success(isLooping ? 'Loop disabled' : 'Loop enabled');
     }
-  };
+  }, [isLooping]);
 
-  const handleVolumeChange = (value: number[]) => {
+  const handleVolumeChange = useCallback((value: number[]) => {
     if (audioRef.current) {
       audioRef.current.volume = value[0] / 100;
       setVolume(value[0]);
     }
-  };
+  }, []);
 
-  const handleSeek = (value: number[]) => {
-    if (audioRef.current) {
+  const handleSeek = useCallback((value: number[]) => {
+    if (audioRef.current && isAudioLoaded) {
       audioRef.current.currentTime = value[0];
       setCurrentTime(value[0]);
     }
-  };
+  }, [isAudioLoaded]);
 
-  const skip = (seconds: number) => {
-    if (audioRef.current) {
+  const skip = useCallback((seconds: number) => {
+    if (audioRef.current && isAudioLoaded) {
       audioRef.current.currentTime = Math.max(0, Math.min(duration, audioRef.current.currentTime + seconds));
     }
-  };
+  }, [duration, isAudioLoaded]);
 
-  const changeSpeed = (speed: number) => {
+  const changeSpeed = useCallback((speed: number) => {
     if (audioRef.current) {
       audioRef.current.playbackRate = speed;
       setPlaybackSpeed(speed);
       toast.success(`Playback speed: ${speed}x`);
     }
-  };
+  }, []);
 
   const formatTime = (time: number) => {
+    if (isNaN(time)) return '00:00';
     const mins = Math.floor(time / 60);
     const secs = Math.floor(time % 60);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
@@ -187,14 +244,18 @@ const AudioEditor: React.FC = () => {
   const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
   const presets = [
-    { name: 'Default', bass: 50, mid: 50, treble: 50 },
-    { name: 'Bass Boost', bass: 80, mid: 50, treble: 40 },
-    { name: 'Treble Boost', bass: 40, mid: 50, treble: 80 },
-    { name: 'Vocal', bass: 40, mid: 70, treble: 60 },
-    { name: 'Rock', bass: 70, mid: 60, treble: 70 },
-    { name: 'Pop', bass: 50, mid: 60, treble: 65 },
-    { name: 'Classical', bass: 45, mid: 55, treble: 50 },
-    { name: 'Electronic', bass: 75, mid: 45, treble: 75 },
+    { name: 'Default', bass: 50, mid: 50, treble: 50, emoji: '🎵' },
+    { name: 'Bass Boost', bass: 80, mid: 50, treble: 40, emoji: '🔊' },
+    { name: 'Treble Boost', bass: 40, mid: 50, treble: 80, emoji: '🎼' },
+    { name: 'Vocal', bass: 40, mid: 70, treble: 60, emoji: '🎤' },
+    { name: 'Rock', bass: 70, mid: 60, treble: 70, emoji: '🎸' },
+    { name: 'Pop', bass: 50, mid: 60, treble: 65, emoji: '🎧' },
+    { name: 'Classical', bass: 45, mid: 55, treble: 50, emoji: '🎻' },
+    { name: 'Electronic', bass: 75, mid: 45, treble: 75, emoji: '🎹' },
+    { name: 'Jazz', bass: 55, mid: 65, treble: 55, emoji: '🎷' },
+    { name: 'Hip Hop', bass: 85, mid: 55, treble: 50, emoji: '🎤' },
+    { name: 'R&B', bass: 70, mid: 60, treble: 55, emoji: '💜' },
+    { name: 'Acoustic', bass: 50, mid: 60, treble: 55, emoji: '🪕' },
   ];
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -213,11 +274,11 @@ const AudioEditor: React.FC = () => {
           type="file"
           ref={fileInputRef}
           onChange={handleAudioUpload}
-          accept="audio/*"
+          accept="audio/mp3,audio/mpeg,audio/wav,audio/ogg,audio/flac,audio/aac,audio/m4a,audio/*"
           className="hidden"
         />
         
-        {audio && <audio ref={audioRef} src={audio} />}
+        {audio && <audio ref={audioRef} src={audio} preload="metadata" />}
 
         {!audio ? (
           <div
@@ -235,7 +296,7 @@ const AudioEditor: React.FC = () => {
                 Drag & drop or click to select
               </p>
               <p className="text-xs text-muted-foreground/60">
-                Supports MP3, WAV, OGG, FLAC, AAC
+                Supports MP3, WAV, OGG, FLAC, AAC, M4A (max 100MB)
               </p>
             </div>
           </div>
@@ -308,10 +369,6 @@ const AudioEditor: React.FC = () => {
                           <Repeat className={`w-4 h-4 mr-2 ${isLooping ? 'text-primary' : ''}`} />
                           {isLooping ? 'Loop Enabled' : 'Enable Loop'}
                         </Button>
-                        <Button variant="glass" size="sm" className="w-full justify-start" onClick={() => toast.info('Coming soon!')}>
-                          <Shuffle className="w-4 h-4 mr-2" />
-                          Shuffle Mode
-                        </Button>
                       </div>
                     </div>
                   </div>
@@ -324,7 +381,7 @@ const AudioEditor: React.FC = () => {
                         <SlidersHorizontal className="w-4 h-4 text-primary" />
                         EQ Presets
                       </h4>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                         {presets.map((preset) => (
                           <button
                             key={preset.name}
@@ -332,9 +389,10 @@ const AudioEditor: React.FC = () => {
                               setEffects(prev => ({ ...prev, bass: preset.bass, mid: preset.mid, treble: preset.treble }));
                               toast.success(`${preset.name} preset applied!`);
                             }}
-                            className="p-2 rounded-lg bg-muted/30 hover:bg-primary/20 transition-all text-xs text-center"
+                            className="p-2 rounded-lg bg-muted/30 hover:bg-primary/20 transition-all text-xs text-center flex flex-col items-center gap-1"
                           >
-                            {preset.name}
+                            <span className="text-lg">{preset.emoji}</span>
+                            <span>{preset.name}</span>
                           </button>
                         ))}
                       </div>
@@ -398,26 +456,10 @@ const AudioEditor: React.FC = () => {
                       </div>
                     ))}
 
-                    <div className="pt-4 border-t border-border/30">
-                      <h4 className="text-sm font-medium mb-3">Sound Effects</h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { name: 'Fade In', icon: Plus },
-                          { name: 'Fade Out', icon: Minus },
-                          { name: 'Normalize', icon: SlidersHorizontal },
-                          { name: 'Noise Gate', icon: Settings },
-                        ].map(({ name, icon: Icon }) => (
-                          <button
-                            key={name}
-                            onClick={() => toast.info(`${name} coming soon!`)}
-                            className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 hover:bg-primary/20 transition-all text-xs"
-                          >
-                            <Icon className="w-3 h-3" />
-                            {name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    <Button variant="glass" size="sm" className="w-full" onClick={resetEffects}>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Reset Effects
+                    </Button>
                   </div>
                 )}
 
@@ -438,7 +480,7 @@ const AudioEditor: React.FC = () => {
                             value={[trimStart]}
                             onValueChange={([v]) => setTrimStart(Math.min(v, trimEnd - 1))}
                             min={0}
-                            max={duration}
+                            max={duration || 100}
                             step={0.1}
                           />
                         </div>
@@ -451,30 +493,18 @@ const AudioEditor: React.FC = () => {
                             value={[trimEnd]}
                             onValueChange={([v]) => setTrimEnd(Math.max(v, trimStart + 1))}
                             min={0}
-                            max={duration}
+                            max={duration || 100}
                             step={0.1}
                           />
                         </div>
                         <div className="text-xs text-muted-foreground text-center py-2 bg-muted/30 rounded">
-                          Selection: {formatTime(trimEnd - trimStart)}
+                          Selection: {formatTime(Math.max(0, trimEnd - trimStart))}
                         </div>
                         <Button variant="glass" size="sm" className="w-full" onClick={handleTrim}>
                           <Scissors className="w-4 h-4 mr-2" />
                           Apply Trim
                         </Button>
                       </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-border/30">
-                      <h4 className="text-sm font-medium mb-3">Split Audio</h4>
-                      <Button 
-                        variant="glass" 
-                        size="sm" 
-                        className="w-full"
-                        onClick={() => toast.info(`Split at ${formatTime(currentTime)} coming soon!`)}
-                      >
-                        Split at {formatTime(currentTime)}
-                      </Button>
                     </div>
                   </div>
                 )}
@@ -485,45 +515,63 @@ const AudioEditor: React.FC = () => {
             <div className="xl:col-span-3 order-1 xl:order-2">
               <div className="editor-canvas rounded-2xl">
                 {/* Waveform Visualization */}
-                <div className="relative h-40 sm:h-56 bg-muted/20 rounded-xl mb-4 overflow-hidden">
-                  <div className="absolute inset-0 flex items-center justify-center gap-[2px] px-4" style={{ transform: `scaleX(${zoomLevel})` }}>
-                    {waveformData.map((height, i) => {
-                      const isBeforeCurrent = (i / waveformData.length) * 100 <= progress;
-                      const isInTrimRange = (i / waveformData.length) * duration >= trimStart && (i / waveformData.length) * duration <= trimEnd;
-                      return (
-                        <div
-                          key={i}
-                          className={`w-1 rounded-full transition-all duration-75 ${
-                            isBeforeCurrent 
-                              ? 'bg-gradient-to-t from-primary to-secondary' 
-                              : isInTrimRange 
-                                ? 'bg-primary/40' 
-                                : 'bg-muted-foreground/20'
-                          }`}
-                          style={{
-                            height: `${height * 100}%`,
-                            opacity: isInTrimRange ? 1 : 0.4,
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
+                <div className="relative h-40 sm:h-56 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl mb-4 overflow-hidden border border-border/20">
+                  {!isAudioLoaded && audio && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                        <p className="text-sm text-muted-foreground">Loading audio...</p>
+                      </div>
+                    </div>
+                  )}
                   
-                  {/* Playhead */}
-                  <div 
-                    className="absolute top-0 bottom-0 w-0.5 bg-primary shadow-lg shadow-primary/50 z-10"
-                    style={{ left: `${progress}%` }}
-                  >
-                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-primary rounded-full" />
-                  </div>
+                  {isAudioLoaded && (
+                    <>
+                      <div 
+                        className="absolute inset-0 flex items-center justify-center gap-[2px] px-4" 
+                        style={{ transform: `scaleX(${zoomLevel})`, transformOrigin: 'center' }}
+                      >
+                        {waveformData.map((height, i) => {
+                          const isBeforeCurrent = (i / waveformData.length) * 100 <= progress;
+                          const isInTrimRange = duration > 0 && 
+                            (i / waveformData.length) * duration >= trimStart && 
+                            (i / waveformData.length) * duration <= trimEnd;
+                          return (
+                            <div
+                              key={i}
+                              className={`w-1 rounded-full transition-all duration-75 ${
+                                isBeforeCurrent 
+                                  ? 'bg-gradient-to-t from-primary to-secondary' 
+                                  : isInTrimRange 
+                                    ? 'bg-primary/40' 
+                                    : 'bg-muted-foreground/20'
+                              }`}
+                              style={{
+                                height: `${height * 100}%`,
+                                opacity: isInTrimRange ? 1 : 0.4,
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Playhead */}
+                      <div 
+                        className="absolute top-0 bottom-0 w-0.5 bg-primary shadow-lg shadow-primary/50 z-10 transition-all"
+                        style={{ left: `${progress}%` }}
+                      >
+                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-primary rounded-full" />
+                      </div>
 
-                  {/* Time markers */}
-                  <div className="absolute bottom-2 left-4 text-xs text-primary font-medium">
-                    {formatTime(currentTime)}
-                  </div>
-                  <div className="absolute bottom-2 right-4 text-xs text-muted-foreground">
-                    {formatTime(duration)}
-                  </div>
+                      {/* Time markers */}
+                      <div className="absolute bottom-2 left-4 text-xs text-primary font-medium bg-background/50 px-2 py-1 rounded">
+                        {formatTime(currentTime)}
+                      </div>
+                      <div className="absolute bottom-2 right-4 text-xs text-muted-foreground bg-background/50 px-2 py-1 rounded">
+                        {formatTime(duration)}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Seek Bar */}
@@ -535,6 +583,7 @@ const AudioEditor: React.FC = () => {
                     max={duration || 100}
                     step={0.1}
                     className="w-full"
+                    disabled={!isAudioLoaded}
                   />
                 </div>
 
@@ -542,19 +591,19 @@ const AudioEditor: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   {/* Playback Controls */}
                   <div className="flex items-center gap-1 sm:gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => skip(-10)}>
+                    <Button variant="ghost" size="sm" onClick={() => skip(-10)} disabled={!isAudioLoaded}>
                       <SkipBack className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => skip(-5)}>
+                    <Button variant="ghost" size="sm" onClick={() => skip(-5)} disabled={!isAudioLoaded}>
                       <Rewind className="w-4 h-4" />
                     </Button>
-                    <Button variant="glow" size="default" onClick={togglePlay} className="px-6">
+                    <Button variant="glow" size="default" onClick={togglePlay} className="px-6" disabled={!isAudioLoaded}>
                       {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => skip(5)}>
+                    <Button variant="ghost" size="sm" onClick={() => skip(5)} disabled={!isAudioLoaded}>
                       <FastForward className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => skip(10)}>
+                    <Button variant="ghost" size="sm" onClick={() => skip(10)} disabled={!isAudioLoaded}>
                       <SkipForward className="w-4 h-4" />
                     </Button>
                   </div>
@@ -588,13 +637,13 @@ const AudioEditor: React.FC = () => {
                     <Button variant="glass" size="sm" onClick={() => fileInputRef.current?.click()}>
                       <Upload className="w-4 h-4 mr-1" /> New
                     </Button>
-                    <Button variant="glass" size="sm" onClick={() => downloadAudio('mp3')}>
+                    <Button variant="glass" size="sm" onClick={() => downloadAudio('mp3')} disabled={!isAudioLoaded}>
                       MP3
                     </Button>
-                    <Button variant="glass" size="sm" onClick={() => downloadAudio('wav')}>
+                    <Button variant="glass" size="sm" onClick={() => downloadAudio('wav')} disabled={!isAudioLoaded}>
                       WAV
                     </Button>
-                    <Button variant="glow" size="sm" onClick={() => downloadAudio('ogg')}>
+                    <Button variant="glow" size="sm" onClick={() => downloadAudio('ogg')} disabled={!isAudioLoaded}>
                       <Download className="w-4 h-4 mr-1" /> OGG
                     </Button>
                   </div>
@@ -610,12 +659,17 @@ const AudioEditor: React.FC = () => {
                     </div>
                     <div>
                       <h4 className="font-medium">{originalFileName}</h4>
-                      <p className="text-xs text-muted-foreground">Duration: {formatTime(duration)} • Speed: {playbackSpeed}x</p>
+                      <p className="text-xs text-muted-foreground">
+                        Duration: {formatTime(duration)} • Speed: {playbackSpeed}x
+                        {audioFile && ` • Size: ${(audioFile.size / (1024 * 1024)).toFixed(1)}MB`}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-1 rounded bg-primary/20 text-primary text-xs">Lossless Export</span>
-                    <span className="px-2 py-1 rounded bg-secondary/20 text-secondary text-xs">No Watermark</span>
+                    <span className="px-2 py-1 rounded bg-primary/20 text-primary text-xs">
+                      {isAudioLoaded ? 'Ready' : 'Loading...'}
+                    </span>
+                    <span className="px-2 py-1 rounded bg-secondary/20 text-secondary text-xs">Lossless Export</span>
                   </div>
                 </div>
               </div>
