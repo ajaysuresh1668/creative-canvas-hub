@@ -209,18 +209,37 @@ const ImageEditor: React.FC = () => {
   };
 
   const presetFilters = [
-    { name: 'Original', brightness: 100, contrast: 100, saturation: 100, sepia: 0, grayscale: 0, hue: 0 },
-    { name: 'Vivid', brightness: 110, contrast: 120, saturation: 140, sepia: 0, grayscale: 0, hue: 0 },
-    { name: 'Warm', brightness: 105, contrast: 105, saturation: 110, sepia: 20, grayscale: 0, hue: 10 },
-    { name: 'Cool', brightness: 100, contrast: 110, saturation: 90, sepia: 0, grayscale: 0, hue: 200 },
-    { name: 'Vintage', brightness: 110, contrast: 85, saturation: 70, sepia: 40, grayscale: 0, hue: 0 },
-    { name: 'B&W', brightness: 105, contrast: 120, saturation: 0, sepia: 0, grayscale: 100, hue: 0 },
-    { name: 'Dramatic', brightness: 95, contrast: 150, saturation: 80, sepia: 0, grayscale: 0, hue: 0 },
-    { name: 'Fade', brightness: 115, contrast: 80, saturation: 80, sepia: 10, grayscale: 0, hue: 0 },
-    { name: 'Sunset', brightness: 105, contrast: 110, saturation: 130, sepia: 15, grayscale: 0, hue: 350 },
-    { name: 'Night', brightness: 80, contrast: 130, saturation: 70, sepia: 0, grayscale: 0, hue: 230 },
-    { name: 'Pop', brightness: 110, contrast: 130, saturation: 150, sepia: 0, grayscale: 0, hue: 0 },
-    { name: 'Matte', brightness: 110, contrast: 90, saturation: 85, sepia: 5, grayscale: 0, hue: 0 },
+    { name: 'Original', brightness: 100, contrast: 100, saturation: 100, sepia: 0, grayscale: 0, hue: 0, emoji: '🎨' },
+    { name: 'Vivid', brightness: 110, contrast: 120, saturation: 140, sepia: 0, grayscale: 0, hue: 0, emoji: '🌈' },
+    { name: 'Warm', brightness: 105, contrast: 105, saturation: 110, sepia: 20, grayscale: 0, hue: 10, emoji: '🔥' },
+    { name: 'Cool', brightness: 100, contrast: 110, saturation: 90, sepia: 0, grayscale: 0, hue: 200, emoji: '❄️' },
+    { name: 'Vintage', brightness: 110, contrast: 85, saturation: 70, sepia: 40, grayscale: 0, hue: 0, emoji: '📷' },
+    { name: 'B&W', brightness: 105, contrast: 120, saturation: 0, sepia: 0, grayscale: 100, hue: 0, emoji: '⬛' },
+    { name: 'Dramatic', brightness: 95, contrast: 150, saturation: 80, sepia: 0, grayscale: 0, hue: 0, emoji: '🎭' },
+    { name: 'Fade', brightness: 115, contrast: 80, saturation: 80, sepia: 10, grayscale: 0, hue: 0, emoji: '🌫️' },
+    { name: 'Sunset', brightness: 105, contrast: 110, saturation: 130, sepia: 15, grayscale: 0, hue: 350, emoji: '🌅' },
+    { name: 'Night', brightness: 80, contrast: 130, saturation: 70, sepia: 0, grayscale: 0, hue: 230, emoji: '🌙' },
+    { name: 'Pop', brightness: 110, contrast: 130, saturation: 150, sepia: 0, grayscale: 0, hue: 0, emoji: '💥' },
+    { name: 'Matte', brightness: 110, contrast: 90, saturation: 85, sepia: 5, grayscale: 0, hue: 0, emoji: '🎬' },
+    // New attractive filters
+    { name: 'Cyberpunk', brightness: 95, contrast: 140, saturation: 160, sepia: 0, grayscale: 0, hue: 280, emoji: '🤖' },
+    { name: 'Neon', brightness: 110, contrast: 130, saturation: 180, sepia: 0, grayscale: 0, hue: 320, emoji: '💜' },
+    { name: 'Aurora', brightness: 105, contrast: 115, saturation: 130, sepia: 0, grayscale: 0, hue: 160, emoji: '🌌' },
+    { name: 'Golden', brightness: 108, contrast: 110, saturation: 120, sepia: 30, grayscale: 0, hue: 25, emoji: '✨' },
+    { name: 'Rose', brightness: 105, contrast: 100, saturation: 110, sepia: 0, grayscale: 0, hue: 340, emoji: '🌹' },
+    { name: 'Ocean', brightness: 100, contrast: 115, saturation: 120, sepia: 0, grayscale: 0, hue: 190, emoji: '🌊' },
+    { name: 'Forest', brightness: 95, contrast: 110, saturation: 100, sepia: 5, grayscale: 0, hue: 90, emoji: '🌲' },
+    { name: 'Retro', brightness: 115, contrast: 95, saturation: 80, sepia: 25, grayscale: 0, hue: 15, emoji: '📻' },
+    { name: 'Noir', brightness: 90, contrast: 140, saturation: 20, sepia: 10, grayscale: 60, hue: 0, emoji: '🕵️' },
+    { name: 'Candy', brightness: 112, contrast: 105, saturation: 140, sepia: 0, grayscale: 0, hue: 300, emoji: '🍭' },
+    { name: 'Electric', brightness: 100, contrast: 135, saturation: 170, sepia: 0, grayscale: 0, hue: 200, emoji: '⚡' },
+    { name: 'Dreamy', brightness: 118, contrast: 85, saturation: 95, sepia: 8, grayscale: 0, hue: 350, emoji: '💭' },
+    { name: 'Tropical', brightness: 108, contrast: 115, saturation: 145, sepia: 5, grayscale: 0, hue: 40, emoji: '🏝️' },
+    { name: 'Midnight', brightness: 75, contrast: 145, saturation: 90, sepia: 0, grayscale: 0, hue: 250, emoji: '🌃' },
+    { name: 'Chrome', brightness: 105, contrast: 130, saturation: 50, sepia: 0, grayscale: 30, hue: 0, emoji: '🔘' },
+    { name: 'Lava', brightness: 95, contrast: 140, saturation: 150, sepia: 10, grayscale: 0, hue: 5, emoji: '🌋' },
+    { name: 'Arctic', brightness: 115, contrast: 105, saturation: 70, sepia: 0, grayscale: 10, hue: 210, emoji: '🧊' },
+    { name: 'Pastel', brightness: 115, contrast: 90, saturation: 75, sepia: 0, grayscale: 0, hue: 0, emoji: '🎀' },
   ];
 
   const applyPreset = (preset: typeof presetFilters[0]) => {
@@ -329,21 +348,26 @@ const ImageEditor: React.FC = () => {
                 )}
 
                 {activeTab === 'filters' && (
-                  <div className="grid grid-cols-3 gap-2">
-                    {presetFilters.map((preset) => (
-                      <button
-                        key={preset.name}
-                        onClick={() => applyPreset(preset)}
-                        className="p-2 rounded-xl bg-muted/30 hover:bg-primary/20 transition-all text-center group"
-                      >
-                        <div className="w-full aspect-square rounded-lg bg-gradient-to-br from-primary/30 to-secondary/30 mb-1 group-hover:scale-105 transition-transform" 
-                          style={{
-                            filter: `brightness(${preset.brightness}%) contrast(${preset.contrast}%) saturate(${preset.saturation}%) sepia(${preset.sepia}%) grayscale(${preset.grayscale}%)`
-                          }}
-                        />
-                        <span className="text-xs">{preset.name}</span>
-                      </button>
-                    ))}
+                  <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-3 gap-2">
+                      {presetFilters.map((preset) => (
+                        <button
+                          key={preset.name}
+                          onClick={() => applyPreset(preset)}
+                          className="p-2 rounded-xl bg-muted/30 hover:bg-primary/20 hover:scale-105 transition-all text-center group relative overflow-hidden border border-transparent hover:border-primary/40"
+                        >
+                          <div className="w-full aspect-square rounded-lg bg-gradient-to-br from-primary/30 via-accent/20 to-secondary/30 mb-1 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform" 
+                            style={{
+                              filter: `brightness(${preset.brightness}%) contrast(${preset.contrast}%) saturate(${preset.saturation}%) sepia(${preset.sepia}%) grayscale(${preset.grayscale}%) hue-rotate(${preset.hue}deg)`
+                            }}
+                          >
+                            {preset.emoji}
+                          </div>
+                          <span className="text-xs font-medium">{preset.name}</span>
+                          <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 

@@ -187,14 +187,31 @@ const VideoEditor: React.FC = () => {
   };
 
   const presetFilters = [
-    { name: 'Original', ...defaultFilters },
-    { name: 'Cinematic', brightness: 95, contrast: 120, saturation: 90, hue: 10, blur: 0, sepia: 10, grayscale: 0 },
-    { name: 'Vintage', brightness: 110, contrast: 90, saturation: 70, hue: 0, blur: 0, sepia: 40, grayscale: 0 },
-    { name: 'B&W Film', brightness: 105, contrast: 130, saturation: 0, hue: 0, blur: 0, sepia: 0, grayscale: 100 },
-    { name: 'Warm', brightness: 105, contrast: 105, saturation: 120, hue: 15, blur: 0, sepia: 15, grayscale: 0 },
-    { name: 'Cool', brightness: 100, contrast: 110, saturation: 90, hue: 200, blur: 0, sepia: 0, grayscale: 0 },
-    { name: 'Dramatic', brightness: 90, contrast: 150, saturation: 80, hue: 0, blur: 0, sepia: 0, grayscale: 0 },
-    { name: 'Dream', brightness: 115, contrast: 85, saturation: 110, hue: 330, blur: 1, sepia: 5, grayscale: 0 },
+    { name: 'Original', ...defaultFilters, emoji: '🎬' },
+    { name: 'Cinematic', brightness: 95, contrast: 120, saturation: 90, hue: 10, blur: 0, sepia: 10, grayscale: 0, emoji: '🎥' },
+    { name: 'Vintage', brightness: 110, contrast: 90, saturation: 70, hue: 0, blur: 0, sepia: 40, grayscale: 0, emoji: '📽️' },
+    { name: 'B&W Film', brightness: 105, contrast: 130, saturation: 0, hue: 0, blur: 0, sepia: 0, grayscale: 100, emoji: '⬛' },
+    { name: 'Warm', brightness: 105, contrast: 105, saturation: 120, hue: 15, blur: 0, sepia: 15, grayscale: 0, emoji: '🔥' },
+    { name: 'Cool', brightness: 100, contrast: 110, saturation: 90, hue: 200, blur: 0, sepia: 0, grayscale: 0, emoji: '❄️' },
+    { name: 'Dramatic', brightness: 90, contrast: 150, saturation: 80, hue: 0, blur: 0, sepia: 0, grayscale: 0, emoji: '🎭' },
+    { name: 'Dream', brightness: 115, contrast: 85, saturation: 110, hue: 330, blur: 1, sepia: 5, grayscale: 0, emoji: '💭' },
+    // New attractive video filters
+    { name: 'Blockbuster', brightness: 98, contrast: 125, saturation: 105, hue: 5, blur: 0, sepia: 8, grayscale: 0, emoji: '🎞️' },
+    { name: 'Horror', brightness: 80, contrast: 145, saturation: 60, hue: 180, blur: 0, sepia: 0, grayscale: 20, emoji: '👻' },
+    { name: 'Romance', brightness: 108, contrast: 95, saturation: 90, hue: 350, blur: 0.5, sepia: 12, grayscale: 0, emoji: '💕' },
+    { name: 'Action', brightness: 95, contrast: 140, saturation: 115, hue: 0, blur: 0, sepia: 0, grayscale: 0, emoji: '💥' },
+    { name: 'Sci-Fi', brightness: 90, contrast: 130, saturation: 140, hue: 200, blur: 0, sepia: 0, grayscale: 0, emoji: '🚀' },
+    { name: 'Western', brightness: 105, contrast: 110, saturation: 85, hue: 25, blur: 0, sepia: 35, grayscale: 0, emoji: '🤠' },
+    { name: 'Neon Night', brightness: 85, contrast: 140, saturation: 180, hue: 280, blur: 0, sepia: 0, grayscale: 0, emoji: '🌃' },
+    { name: 'Summer', brightness: 110, contrast: 105, saturation: 130, hue: 40, blur: 0, sepia: 8, grayscale: 0, emoji: '☀️' },
+    { name: 'Winter', brightness: 108, contrast: 110, saturation: 70, hue: 210, blur: 0, sepia: 0, grayscale: 15, emoji: '❄️' },
+    { name: 'Documentary', brightness: 100, contrast: 115, saturation: 95, hue: 0, blur: 0, sepia: 5, grayscale: 0, emoji: '📹' },
+    { name: 'Music Video', brightness: 105, contrast: 135, saturation: 160, hue: 320, blur: 0, sepia: 0, grayscale: 0, emoji: '🎵' },
+    { name: 'Anime', brightness: 108, contrast: 120, saturation: 145, hue: 0, blur: 0, sepia: 0, grayscale: 0, emoji: '🎌' },
+    { name: 'Vlog', brightness: 105, contrast: 108, saturation: 115, hue: 10, blur: 0, sepia: 5, grayscale: 0, emoji: '📱' },
+    { name: 'Thriller', brightness: 85, contrast: 140, saturation: 80, hue: 190, blur: 0, sepia: 5, grayscale: 10, emoji: '🔪' },
+    { name: 'Fantasy', brightness: 102, contrast: 115, saturation: 125, hue: 290, blur: 0.3, sepia: 0, grayscale: 0, emoji: '🧙' },
+    { name: 'Noir', brightness: 88, contrast: 150, saturation: 30, hue: 0, blur: 0, sepia: 15, grayscale: 50, emoji: '🕵️' },
   ];
 
   const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
@@ -344,7 +361,7 @@ const VideoEditor: React.FC = () => {
                 )}
 
                 {activeTab === 'filters' && (
-                  <div className="space-y-4">
+                  <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
                     <div className="grid grid-cols-2 gap-2">
                       {presetFilters.map((preset) => (
                         <button
@@ -353,15 +370,18 @@ const VideoEditor: React.FC = () => {
                             setFilters(preset);
                             toast.success(`${preset.name} filter applied!`);
                           }}
-                          className="p-2 rounded-xl bg-muted/30 hover:bg-primary/20 transition-all text-center group"
+                          className="p-2 rounded-xl bg-muted/30 hover:bg-primary/20 hover:scale-105 transition-all text-center group relative overflow-hidden border border-transparent hover:border-primary/40"
                         >
-                          <div className="w-full aspect-video rounded-lg bg-gradient-to-br from-muted to-muted/50 mb-1 group-hover:scale-105 transition-transform overflow-hidden">
+                          <div className="w-full aspect-video rounded-lg bg-gradient-to-br from-muted via-accent/10 to-muted/50 mb-1 group-hover:scale-110 transition-transform overflow-hidden flex items-center justify-center">
                             <div 
-                              className="w-full h-full bg-gradient-to-br from-primary/40 to-secondary/40"
-                              style={{ filter: `brightness(${preset.brightness}%) contrast(${preset.contrast}%) saturate(${preset.saturation}%) sepia(${preset.sepia}%) grayscale(${preset.grayscale}%)` }}
-                            />
+                              className="w-full h-full bg-gradient-to-br from-primary/40 via-accent/30 to-secondary/40 flex items-center justify-center text-xl"
+                              style={{ filter: `brightness(${preset.brightness}%) contrast(${preset.contrast}%) saturate(${preset.saturation}%) sepia(${preset.sepia}%) grayscale(${preset.grayscale}%) hue-rotate(${preset.hue}deg)` }}
+                            >
+                              {preset.emoji}
+                            </div>
                           </div>
-                          <span className="text-xs">{preset.name}</span>
+                          <span className="text-xs font-medium">{preset.name}</span>
+                          <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                         </button>
                       ))}
                     </div>
