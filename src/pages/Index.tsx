@@ -4,6 +4,7 @@ import FloatingLetters from '@/components/FloatingLetters';
 import Navbar from '@/components/Navbar';
 import HeroSection from '@/components/HeroSection';
 import FeaturesSection from '@/components/FeaturesSection';
+import UniqueFeatures from '@/components/UniqueFeatures';
 import CTASection from '@/components/CTASection';
 import Footer from '@/components/Footer';
 
@@ -27,6 +28,7 @@ const Index: React.FC = () => {
         <main>
           <HeroSection />
           <FeaturesSection />
+          <UniqueFeatures />
           <CTASection />
         </main>
         
