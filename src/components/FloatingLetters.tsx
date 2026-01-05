@@ -51,67 +51,71 @@ const symbols: FloatingElement[] = [
 
 const FloatingLetters: React.FC = () => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
     };
+    const handleMouseEnter = () => setIsHovered(true);
+    const handleMouseLeave = () => setIsHovered(false);
+    
     window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    document.body.addEventListener('mouseenter', handleMouseEnter);
+    document.body.addEventListener('mouseleave', handleMouseLeave);
+    
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      document.body.removeEventListener('mouseenter', handleMouseEnter);
+      document.body.removeEventListener('mouseleave', handleMouseLeave);
+    };
   }, []);
 
-  const allElements = [...staticLetters, ...symbols];
+  // Reduce elements when mouse is on screen
+  const visibleLetters = isHovered ? staticLetters.slice(0, 8) : staticLetters;
+  const visibleSymbols = isHovered ? symbols.slice(0, 6) : symbols;
+  const allElements = [...visibleLetters, ...visibleSymbols];
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-      {/* Floating Letters */}
+      {/* Floating Letters - reduced animation on hover */}
       {allElements.map((letter, index) => (
         <span
           key={index}
-          className={`floating-letter ${letter.color} ${letter.size} font-black select-none`}
+          className={`floating-letter ${letter.color} ${letter.size} font-black select-none transition-opacity duration-500`}
           style={{
             top: letter.top,
             left: letter.left,
             animationDelay: `${index * 0.2}s`,
             transform: `rotate(${letter.rotation || 0}deg)`,
             textShadow: '0 0 30px currentColor',
+            opacity: isHovered ? 0.4 : 1,
+            animationPlayState: isHovered ? 'paused' : 'running',
           }}
         >
           {letter.char}
         </span>
       ))}
       
-      {/* Main gradient orbs - super vibrant */}
-      <div className="absolute top-[15%] left-[20%] w-[600px] h-[600px] bg-gradient-radial from-primary/15 via-primary/5 to-transparent rounded-full blur-[100px] animate-pulse-glow" />
-      <div className="absolute bottom-[20%] right-[15%] w-[500px] h-[500px] bg-gradient-radial from-secondary/15 via-secondary/5 to-transparent rounded-full blur-[100px] animate-pulse-glow animation-delay-400" />
-      <div className="absolute top-[50%] right-[25%] w-[400px] h-[400px] bg-gradient-radial from-accent/12 via-accent/4 to-transparent rounded-full blur-[80px] animate-pulse-glow animation-delay-800" />
-      <div className="absolute bottom-[30%] left-[25%] w-[450px] h-[450px] bg-gradient-radial from-success/10 via-success/3 to-transparent rounded-full blur-[90px] animate-pulse-glow animation-delay-600" />
+      {/* Main gradient orbs - reduced on hover */}
+      <div className={`absolute top-[15%] left-[20%] w-[600px] h-[600px] bg-gradient-radial from-primary/15 via-primary/5 to-transparent rounded-full blur-[100px] transition-opacity duration-500 ${isHovered ? 'opacity-50 animate-none' : 'animate-pulse-glow'}`} />
+      <div className={`absolute bottom-[20%] right-[15%] w-[500px] h-[500px] bg-gradient-radial from-secondary/15 via-secondary/5 to-transparent rounded-full blur-[100px] transition-opacity duration-500 animation-delay-400 ${isHovered ? 'opacity-50 animate-none' : 'animate-pulse-glow'}`} />
+      <div className={`absolute top-[50%] right-[25%] w-[400px] h-[400px] bg-gradient-radial from-accent/12 via-accent/4 to-transparent rounded-full blur-[80px] transition-opacity duration-500 animation-delay-800 ${isHovered ? 'opacity-50 animate-none' : 'animate-pulse-glow'}`} />
+      <div className={`absolute bottom-[30%] left-[25%] w-[450px] h-[450px] bg-gradient-radial from-success/10 via-success/3 to-transparent rounded-full blur-[90px] transition-opacity duration-500 animation-delay-600 ${isHovered ? 'opacity-50 animate-none' : 'animate-pulse-glow'}`} />
       
-      {/* Secondary orbs */}
-      <div className="absolute top-[5%] right-[10%] w-[300px] h-[300px] bg-gradient-radial from-warning/12 via-warning/4 to-transparent rounded-full blur-[70px] animate-pulse-glow animation-delay-200" />
-      <div className="absolute bottom-[10%] left-[5%] w-[250px] h-[250px] bg-gradient-radial from-info/15 via-info/5 to-transparent rounded-full blur-[60px] animate-pulse-glow animation-delay-1000" />
-      <div className="absolute top-[40%] left-[10%] w-[200px] h-[200px] bg-gradient-radial from-primary/10 via-primary/3 to-transparent rounded-full blur-[50px] animate-pulse-glow animation-delay-500" />
-      <div className="absolute bottom-[50%] right-[5%] w-[180px] h-[180px] bg-gradient-radial from-secondary/12 via-secondary/4 to-transparent rounded-full blur-[45px] animate-pulse-glow animation-delay-800" />
-      
-      {/* Interactive glow following cursor */}
+      {/* Interactive glow following cursor - more subtle */}
       <div 
-        className="absolute w-[300px] h-[300px] bg-gradient-radial from-primary/8 via-accent/4 to-transparent rounded-full blur-[60px] transition-all duration-1000 ease-out pointer-events-none"
+        className="absolute w-[200px] h-[200px] bg-gradient-radial from-primary/5 via-accent/3 to-transparent rounded-full blur-[40px] transition-all duration-700 ease-out pointer-events-none"
         style={{
-          left: mousePosition.x - 150,
-          top: mousePosition.y - 150,
+          left: mousePosition.x - 100,
+          top: mousePosition.y - 100,
+          opacity: isHovered ? 0.3 : 0.6,
         }}
       />
       
-      {/* Animated gradient lines */}
-      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/40 to-transparent animate-shimmer" />
-      <div className="absolute bottom-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-secondary/40 to-transparent animate-shimmer animation-delay-500" />
-      <div className="absolute top-0 left-0 h-full w-[2px] bg-gradient-to-b from-transparent via-accent/30 to-transparent animate-shimmer animation-delay-200" />
-      <div className="absolute top-0 right-0 h-full w-[2px] bg-gradient-to-b from-transparent via-primary/30 to-transparent animate-shimmer animation-delay-800" />
-      
-      {/* Diagonal decorative lines */}
-      <div className="absolute top-[20%] left-[10%] w-[200px] h-[1px] bg-gradient-to-r from-primary/30 to-transparent rotate-45 animate-pulse" />
-      <div className="absolute bottom-[25%] right-[15%] w-[150px] h-[1px] bg-gradient-to-r from-secondary/30 to-transparent -rotate-45 animate-pulse animation-delay-400" />
-      <div className="absolute top-[60%] left-[70%] w-[180px] h-[1px] bg-gradient-to-r from-accent/25 to-transparent rotate-12 animate-pulse animation-delay-600" />
+      {/* Animated gradient lines - hidden on hover */}
+      <div className={`absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/30 to-transparent transition-opacity duration-500 ${isHovered ? 'opacity-20' : 'animate-shimmer'}`} />
+      <div className={`absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-secondary/30 to-transparent transition-opacity duration-500 animation-delay-500 ${isHovered ? 'opacity-20' : 'animate-shimmer'}`} />
     </div>
   );
 };
