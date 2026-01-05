@@ -11,6 +11,7 @@ import ImageEditor from "./pages/ImageEditor";
 import VideoEditor from "./pages/VideoEditor";
 import AudioEditor from "./pages/AudioEditor";
 import DocumentEditor from "./pages/DocumentEditor";
+import MusicPlayer from "./pages/MusicPlayer";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/video-editor" element={<VideoEditor />} />
               <Route path="/audio-editor" element={<AudioEditor />} />
               <Route path="/document-editor" element={<DocumentEditor />} />
+              <Route path="/music-player" element={<MusicPlayer />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

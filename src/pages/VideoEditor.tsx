@@ -3,7 +3,8 @@ import {
   Video, Upload, Play, Pause, Volume2, VolumeX, SkipBack, SkipForward,
   Scissors, Download, RotateCcw, FastForward, Rewind, Maximize, Minimize,
   Settings, Layers, Type, Music, Image, Sparkles, Clock, SlidersHorizontal,
-  ChevronLeft, ChevronRight, Square, Circle, Zap, Film, Palette, Sun, Contrast
+  ChevronLeft, ChevronRight, Square, Circle, Zap, Film, Palette, Sun, Contrast,
+  Sticker, Trash2, Smile
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -19,6 +20,26 @@ interface VideoFilters {
   blur: number;
   sepia: number;
   grayscale: number;
+}
+
+interface TextOverlay {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  fontWeight: string;
+  isMarquee: boolean;
+}
+
+interface StickerOverlay {
+  id: string;
+  emoji: string;
+  x: number;
+  y: number;
+  size: number;
 }
 
 const defaultFilters: VideoFilters = {
@@ -43,9 +64,19 @@ const VideoEditor: React.FC = () => {
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(100);
   const [filters, setFilters] = useState<VideoFilters>(defaultFilters);
-  const [activeTab, setActiveTab] = useState<'timeline' | 'filters' | 'effects' | 'audio'>('timeline');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'filters' | 'effects' | 'overlays' | 'audio'>('timeline');
   const [showTrimHandles, setShowTrimHandles] = useState(false);
   const [originalFileName, setOriginalFileName] = useState('edited-video');
+  
+  // Text & Sticker overlays
+  const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
+  const [stickers, setStickers] = useState<StickerOverlay[]>([]);
+  const [newText, setNewText] = useState('');
+  const [textFontSize, setTextFontSize] = useState(32);
+  const [textColor, setTextColor] = useState('#ffffff');
+  const [textFontFamily, setTextFontFamily] = useState('Arial');
+  const [textFontWeight, setTextFontWeight] = useState('normal');
+  const [isMarquee, setIsMarquee] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -176,6 +207,49 @@ const VideoEditor: React.FC = () => {
     setShowTrimHandles(true);
   };
 
+  const addTextOverlay = () => {
+    if (!newText.trim()) {
+      toast.error('Please enter some text');
+      return;
+    }
+    
+    const overlay: TextOverlay = {
+      id: Date.now().toString(),
+      text: newText,
+      x: 50,
+      y: 50,
+      fontSize: textFontSize,
+      fontFamily: textFontFamily,
+      color: textColor,
+      fontWeight: textFontWeight,
+      isMarquee: isMarquee,
+    };
+    
+    setTextOverlays(prev => [...prev, overlay]);
+    setNewText('');
+    toast.success('Text added to video!');
+  };
+
+  const addSticker = (emoji: string) => {
+    const sticker: StickerOverlay = {
+      id: Date.now().toString(),
+      emoji,
+      x: Math.random() * 60 + 20,
+      y: Math.random() * 60 + 20,
+      size: 48,
+    };
+    setStickers(prev => [...prev, sticker]);
+    toast.success('Sticker added!');
+  };
+
+  const removeTextOverlay = (id: string) => {
+    setTextOverlays(prev => prev.filter(t => t.id !== id));
+  };
+
+  const removeSticker = (id: string) => {
+    setStickers(prev => prev.filter(s => s.id !== id));
+  };
+
   const downloadVideo = () => {
     if (video) {
       const link = document.createElement('a');
@@ -261,7 +335,7 @@ const VideoEditor: React.FC = () => {
               <div className="editor-sidebar rounded-2xl">
                 {/* Tabs */}
                 <div className="flex gap-1 p-1 bg-muted/30 rounded-xl mb-4 overflow-x-auto">
-                  {(['timeline', 'filters', 'effects', 'audio'] as const).map((tab) => (
+                  {(['timeline', 'filters', 'overlays', 'audio'] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
@@ -388,51 +462,144 @@ const VideoEditor: React.FC = () => {
                   </div>
                 )}
 
-                {activeTab === 'effects' && (
-                  <div className="space-y-4">
-                    {[
-                      { label: 'Brightness', icon: Sun, value: filters.brightness, key: 'brightness', min: 50, max: 150 },
-                      { label: 'Contrast', icon: Contrast, value: filters.contrast, key: 'contrast', min: 50, max: 150 },
-                      { label: 'Saturation', icon: Palette, value: filters.saturation, key: 'saturation', min: 0, max: 200 },
-                      { label: 'Hue', icon: Palette, value: filters.hue, key: 'hue', min: 0, max: 360 },
-                    ].map(({ label, icon: Icon, value, key, min, max }) => (
-                      <div key={key}>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <Icon className="w-4 h-4 text-primary" />
-                            <span className="text-sm font-medium">{label}</span>
-                          </div>
-                          <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
-                            {value}{key === 'hue' ? '°' : '%'}
-                          </span>
-                        </div>
-                        <Slider
-                          value={[value]}
-                          onValueChange={([v]) => setFilters(prev => ({ ...prev, [key]: v }))}
-                          min={min}
-                          max={max}
-                          step={1}
+                {activeTab === 'overlays' && (
+                  <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                    {/* Text Overlay */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <Type className="w-4 h-4 text-primary" />
+                        Add Text
+                      </h4>
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          value={newText}
+                          onChange={(e) => setNewText(e.target.value)}
+                          placeholder="Enter your text..."
+                          className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/30 text-sm focus:outline-none focus:border-primary/50"
                         />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Font</label>
+                            <select
+                              value={textFontFamily}
+                              onChange={(e) => setTextFontFamily(e.target.value)}
+                              className="w-full px-2 py-1.5 rounded bg-muted/50 border border-border/30 text-xs"
+                            >
+                              <option value="Arial">Arial</option>
+                              <option value="Georgia">Georgia</option>
+                              <option value="Impact">Impact</option>
+                              <option value="Comic Sans MS">Comic Sans</option>
+                              <option value="Courier New">Courier</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Size</label>
+                            <input
+                              type="number"
+                              value={textFontSize}
+                              onChange={(e) => setTextFontSize(Number(e.target.value))}
+                              className="w-full px-2 py-1.5 rounded bg-muted/50 border border-border/30 text-xs"
+                              min={8}
+                              max={120}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={textColor}
+                            onChange={(e) => setTextColor(e.target.value)}
+                            className="w-8 h-8 rounded cursor-pointer"
+                          />
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => setTextFontWeight(textFontWeight === 'bold' ? 'normal' : 'bold')}
+                              className={`px-2 py-1 rounded text-xs font-bold ${textFontWeight === 'bold' ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}`}
+                            >
+                              B
+                            </button>
+                            <button
+                              onClick={() => setIsMarquee(!isMarquee)}
+                              className={`px-2 py-1 rounded text-xs ${isMarquee ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}`}
+                              title="Marquee Animation"
+                            >
+                              ⟷
+                            </button>
+                          </div>
+                        </div>
+                        <Button variant="glow" size="sm" className="w-full" onClick={addTextOverlay}>
+                          Add Text
+                        </Button>
+                        
+                        {textOverlays.length > 0 && (
+                          <div className="space-y-1 mt-2">
+                            {textOverlays.map((overlay) => (
+                              <div key={overlay.id} className="flex items-center justify-between p-2 rounded bg-muted/30 text-xs">
+                                <span className="truncate">{overlay.text}</span>
+                                <button onClick={() => removeTextOverlay(overlay.id)} className="text-red-400 hover:text-red-500">
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    </div>
 
+                    {/* Stickers & Emojis */}
                     <div className="pt-4 border-t border-border/30">
-                      <h4 className="text-sm font-medium mb-3">Quick Effects</h4>
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <Sticker className="w-4 h-4 text-primary" />
+                        Stickers & Emoji
+                      </h4>
+                      <div className="grid grid-cols-6 gap-1">
+                        {['😀', '😎', '❤️', '⭐', '🔥', '💯', '✨', '🎉', '👑', '🌟', '💖', '🎨', '🎬', '🎥', '🎵', '🎮', '🚀', '💫'].map((emoji) => (
+                          <button
+                            key={emoji}
+                            onClick={() => addSticker(emoji)}
+                            className="p-2 text-xl hover:scale-125 transition-transform hover:bg-muted/50 rounded"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                      {stickers.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {stickers.map((sticker) => (
+                            <button 
+                              key={sticker.id} 
+                              onClick={() => removeSticker(sticker.id)}
+                              className="px-2 py-1 rounded bg-muted/30 text-sm hover:bg-red-500/20"
+                            >
+                              {sticker.emoji} ✕
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Effects */}
+                    <div className="pt-4 border-t border-border/30">
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        Effects
+                      </h4>
                       <div className="grid grid-cols-2 gap-2">
                         {[
-                          { name: 'Slow Mo', icon: Rewind },
-                          { name: 'Speed Up', icon: FastForward },
-                          { name: 'Reverse', icon: RotateCcw },
-                          { name: 'Loop', icon: Circle },
-                        ].map(({ name, icon: Icon }) => (
-                          <button
-                            key={name}
-                            onClick={() => toast.info(`${name} effect coming soon!`)}
-                            className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 hover:bg-primary/20 transition-all text-sm"
-                          >
-                            <Icon className="w-4 h-4" />
-                            {name}
-                          </button>
+                          { label: 'Brightness', key: 'brightness', value: filters.brightness, min: 50, max: 150 },
+                          { label: 'Contrast', key: 'contrast', value: filters.contrast, min: 50, max: 150 },
+                        ].map(({ label, key, value, min, max }) => (
+                          <div key={key} className="space-y-1">
+                            <label className="text-xs text-muted-foreground">{label}</label>
+                            <Slider
+                              value={[value]}
+                              onValueChange={([v]) => setFilters(prev => ({ ...prev, [key]: v }))}
+                              min={min}
+                              max={max}
+                              step={1}
+                            />
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -494,6 +661,42 @@ const VideoEditor: React.FC = () => {
                     style={{ filter: getFilterString() }}
                     onClick={togglePlay}
                   />
+                  
+                  {/* Text Overlays Display */}
+                  {textOverlays.map((overlay) => (
+                    <div
+                      key={overlay.id}
+                      className={`absolute pointer-events-none ${overlay.isMarquee ? 'animate-marquee' : ''}`}
+                      style={{
+                        left: `${overlay.x}%`,
+                        top: `${overlay.y}%`,
+                        fontSize: `${overlay.fontSize}px`,
+                        fontFamily: overlay.fontFamily,
+                        color: overlay.color,
+                        fontWeight: overlay.fontWeight,
+                        textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                    >
+                      {overlay.text}
+                    </div>
+                  ))}
+                  
+                  {/* Stickers Display */}
+                  {stickers.map((sticker) => (
+                    <div
+                      key={sticker.id}
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${sticker.x}%`,
+                        top: `${sticker.y}%`,
+                        fontSize: `${sticker.size}px`,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                    >
+                      {sticker.emoji}
+                    </div>
+                  ))}
                   
                   {/* Play/Pause overlay */}
                   {!isPlaying && (

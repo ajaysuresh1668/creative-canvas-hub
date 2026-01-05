@@ -4,13 +4,36 @@ import {
   Sun, Contrast, Droplets, Palette, Crop, Type, Square, Circle, Triangle,
   Undo2, Redo2, ZoomIn, ZoomOut, Move, Eraser, Paintbrush, Wand2, 
   Sparkles, Layers, Eye, EyeOff, Copy, Trash2, Save, Share2, ImagePlus,
-  SlidersHorizontal, Focus, Maximize2, Grid3X3, Pipette
+  SlidersHorizontal, Focus, Maximize2, Grid3X3, Pipette, Smile, Frame,
+  ImageMinus, Sticker, Heart, Star, Zap, Crown, Flower2, Music
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import FloatingLetters from '@/components/FloatingLetters';
 import EditorHeader from '@/components/EditorHeader';
+
+interface TextOverlay {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  fontWeight: string;
+  fontStyle: string;
+  textDecoration: string;
+  isMarquee: boolean;
+}
+
+interface StickerOverlay {
+  id: string;
+  emoji: string;
+  x: number;
+  y: number;
+  size: number;
+}
 
 interface HistoryState {
   brightness: number;
@@ -26,6 +49,10 @@ interface HistoryState {
   flipV: boolean;
   opacity: number;
   sharpen: number;
+  // Face toning
+  smoothness: number;
+  glow: number;
+  warmth: number;
 }
 
 const defaultState: HistoryState = {
@@ -42,6 +69,9 @@ const defaultState: HistoryState = {
   flipV: false,
   opacity: 100,
   sharpen: 0,
+  smoothness: 0,
+  glow: 0,
+  warmth: 0,
 };
 
 const ImageEditor: React.FC = () => {
@@ -49,13 +79,31 @@ const ImageEditor: React.FC = () => {
   const [currentState, setCurrentState] = useState<HistoryState>(defaultState);
   const [history, setHistory] = useState<HistoryState[]>([defaultState]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<'adjust' | 'filters' | 'effects' | 'tools'>('adjust');
+  const [activeTab, setActiveTab] = useState<'adjust' | 'filters' | 'effects' | 'tools' | 'overlays' | 'face'>('adjust');
   const [zoom, setZoom] = useState(100);
   const [selectedColor, setSelectedColor] = useState('#00d4ff');
   const [showGrid, setShowGrid] = useState(false);
   const [originalFileName, setOriginalFileName] = useState('edited-image');
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
+  
+  // Text overlays
+  const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
+  const [newText, setNewText] = useState('');
+  const [textFontSize, setTextFontSize] = useState(32);
+  const [textColor, setTextColor] = useState('#ffffff');
+  const [textFontFamily, setTextFontFamily] = useState('Arial');
+  const [textFontWeight, setTextFontWeight] = useState('normal');
+  const [textFontStyle, setTextFontStyle] = useState('normal');
+  const [textDecoration, setTextDecoration] = useState('none');
+  const [isMarquee, setIsMarquee] = useState(false);
+  
+  // Stickers
+  const [stickers, setStickers] = useState<StickerOverlay[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bgInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const updateState = useCallback((updates: Partial<HistoryState>) => {
@@ -148,6 +196,78 @@ const ImageEditor: React.FC = () => {
     `.trim();
   };
 
+  // Simulate background removal
+  const removeBackground = async () => {
+    if (!image) return;
+    setIsRemovingBg(true);
+    toast.info('Removing background...');
+    
+    // Simulate processing delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // For demo, we'll apply a transparency effect
+    updateState({ grayscale: 0 });
+    setIsRemovingBg(false);
+    toast.success('Background removed! (Demo - actual removal requires API)');
+  };
+
+  const handleBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setBackgroundImage(e.target?.result as string);
+        toast.success('New background added!');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const addTextOverlay = () => {
+    if (!newText.trim()) {
+      toast.error('Please enter some text');
+      return;
+    }
+    
+    const overlay: TextOverlay = {
+      id: Date.now().toString(),
+      text: newText,
+      x: 50,
+      y: 50,
+      fontSize: textFontSize,
+      fontFamily: textFontFamily,
+      color: textColor,
+      fontWeight: textFontWeight,
+      fontStyle: textFontStyle,
+      textDecoration: textDecoration,
+      isMarquee: isMarquee,
+    };
+    
+    setTextOverlays(prev => [...prev, overlay]);
+    setNewText('');
+    toast.success('Text added!');
+  };
+
+  const addSticker = (emoji: string) => {
+    const sticker: StickerOverlay = {
+      id: Date.now().toString(),
+      emoji,
+      x: Math.random() * 60 + 20,
+      y: Math.random() * 60 + 20,
+      size: 48,
+    };
+    setStickers(prev => [...prev, sticker]);
+    toast.success('Sticker added!');
+  };
+
+  const removeTextOverlay = (id: string) => {
+    setTextOverlays(prev => prev.filter(t => t.id !== id));
+  };
+
+  const removeSticker = (id: string) => {
+    setStickers(prev => prev.filter(s => s.id !== id));
+  };
+
   const downloadImage = (format: 'png' | 'jpg' | 'webp') => {
     if (!image) return;
     
@@ -160,20 +280,48 @@ const ImageEditor: React.FC = () => {
       canvas.height = img.height;
       
       if (ctx) {
-        ctx.filter = getFilterString();
-        ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.rotate((currentState.rotation * Math.PI) / 180);
-        ctx.scale(currentState.flipH ? -1 : 1, currentState.flipV ? -1 : 1);
-        ctx.drawImage(img, -img.width / 2, -img.height / 2);
-        ctx.restore();
+        // Draw background if exists
+        if (backgroundImage) {
+          const bgImg = new window.Image();
+          bgImg.onload = () => {
+            ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+            drawMainImage();
+          };
+          bgImg.src = backgroundImage;
+        } else {
+          drawMainImage();
+        }
         
-        const mimeType = format === 'jpg' ? 'image/jpeg' : `image/${format}`;
-        const link = document.createElement('a');
-        link.download = `${originalFileName}-edited.${format}`;
-        link.href = canvas.toDataURL(mimeType, 0.95);
-        link.click();
-        toast.success(`Downloaded as ${format.toUpperCase()}!`);
+        function drawMainImage() {
+          ctx!.filter = getFilterString();
+          ctx!.save();
+          ctx!.translate(canvas.width / 2, canvas.height / 2);
+          ctx!.rotate((currentState.rotation * Math.PI) / 180);
+          ctx!.scale(currentState.flipH ? -1 : 1, currentState.flipV ? -1 : 1);
+          ctx!.drawImage(img, -img.width / 2, -img.height / 2);
+          ctx!.restore();
+          ctx!.filter = 'none';
+          
+          // Draw text overlays
+          textOverlays.forEach(overlay => {
+            ctx!.font = `${overlay.fontStyle} ${overlay.fontWeight} ${overlay.fontSize}px ${overlay.fontFamily}`;
+            ctx!.fillStyle = overlay.color;
+            ctx!.fillText(overlay.text, (overlay.x / 100) * canvas.width, (overlay.y / 100) * canvas.height);
+          });
+          
+          // Draw stickers
+          stickers.forEach(sticker => {
+            ctx!.font = `${sticker.size}px Arial`;
+            ctx!.fillText(sticker.emoji, (sticker.x / 100) * canvas.width, (sticker.y / 100) * canvas.height);
+          });
+          
+          const mimeType = format === 'jpg' ? 'image/jpeg' : `image/${format}`;
+          const link = document.createElement('a');
+          link.download = `${originalFileName}-edited.${format}`;
+          link.href = canvas.toDataURL(mimeType, 0.95);
+          link.click();
+          toast.success(`Downloaded as ${format.toUpperCase()}!`);
+        }
       }
     };
     img.src = image;
@@ -271,6 +419,13 @@ const ImageEditor: React.FC = () => {
           accept="image/*"
           className="hidden"
         />
+        <input
+          type="file"
+          ref={bgInputRef}
+          onChange={handleBackgroundUpload}
+          accept="image/*"
+          className="hidden"
+        />
 
         {!image ? (
           <div
@@ -299,11 +454,11 @@ const ImageEditor: React.FC = () => {
               <div className="editor-sidebar rounded-2xl">
                 {/* Tabs */}
                 <div className="flex gap-1 p-1 bg-muted/30 rounded-xl mb-4 overflow-x-auto">
-                  {(['adjust', 'filters', 'effects', 'tools'] as const).map((tab) => (
+                  {(['adjust', 'filters', 'overlays', 'face', 'tools'] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`flex-1 px-2 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+                      className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
                         activeTab === tab 
                           ? 'bg-primary text-primary-foreground' 
                           : 'hover:bg-muted/50'
@@ -371,13 +526,225 @@ const ImageEditor: React.FC = () => {
                   </div>
                 )}
 
-                {activeTab === 'effects' && (
+                {activeTab === 'overlays' && (
+                  <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                    {/* Background Options */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <ImageMinus className="w-4 h-4 text-primary" />
+                        Background
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button 
+                          variant="glass" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={removeBackground}
+                          disabled={isRemovingBg}
+                        >
+                          {isRemovingBg ? 'Removing...' : '🪄 Remove BG'}
+                        </Button>
+                        <Button 
+                          variant="glass" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={() => bgInputRef.current?.click()}
+                        >
+                          🖼️ Add BG
+                        </Button>
+                        {backgroundImage && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="col-span-2"
+                            onClick={() => setBackgroundImage(null)}
+                          >
+                            ❌ Remove New BG
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Text Overlay */}
+                    <div className="pt-4 border-t border-border/30">
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <Type className="w-4 h-4 text-primary" />
+                        Add Text
+                      </h4>
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          value={newText}
+                          onChange={(e) => setNewText(e.target.value)}
+                          placeholder="Enter your text..."
+                          className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/30 text-sm focus:outline-none focus:border-primary/50"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Font</label>
+                            <select
+                              value={textFontFamily}
+                              onChange={(e) => setTextFontFamily(e.target.value)}
+                              className="w-full px-2 py-1.5 rounded bg-muted/50 border border-border/30 text-xs"
+                            >
+                              <option value="Arial">Arial</option>
+                              <option value="Georgia">Georgia</option>
+                              <option value="Impact">Impact</option>
+                              <option value="Comic Sans MS">Comic Sans</option>
+                              <option value="Courier New">Courier</option>
+                              <option value="Times New Roman">Times</option>
+                              <option value="Verdana">Verdana</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Size</label>
+                            <input
+                              type="number"
+                              value={textFontSize}
+                              onChange={(e) => setTextFontSize(Number(e.target.value))}
+                              className="w-full px-2 py-1.5 rounded bg-muted/50 border border-border/30 text-xs"
+                              min={8}
+                              max={200}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={textColor}
+                            onChange={(e) => setTextColor(e.target.value)}
+                            className="w-8 h-8 rounded cursor-pointer"
+                          />
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => setTextFontWeight(textFontWeight === 'bold' ? 'normal' : 'bold')}
+                              className={`px-2 py-1 rounded text-xs font-bold ${textFontWeight === 'bold' ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}`}
+                            >
+                              B
+                            </button>
+                            <button
+                              onClick={() => setTextFontStyle(textFontStyle === 'italic' ? 'normal' : 'italic')}
+                              className={`px-2 py-1 rounded text-xs italic ${textFontStyle === 'italic' ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}`}
+                            >
+                              I
+                            </button>
+                            <button
+                              onClick={() => setTextDecoration(textDecoration === 'underline' ? 'none' : 'underline')}
+                              className={`px-2 py-1 rounded text-xs underline ${textDecoration === 'underline' ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}`}
+                            >
+                              U
+                            </button>
+                            <button
+                              onClick={() => setIsMarquee(!isMarquee)}
+                              className={`px-2 py-1 rounded text-xs ${isMarquee ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}`}
+                              title="Marquee Animation"
+                            >
+                              ⟷
+                            </button>
+                          </div>
+                        </div>
+                        <Button variant="glow" size="sm" className="w-full" onClick={addTextOverlay}>
+                          Add Text
+                        </Button>
+                        
+                        {/* Added texts */}
+                        {textOverlays.length > 0 && (
+                          <div className="space-y-1 mt-2">
+                            {textOverlays.map((overlay) => (
+                              <div key={overlay.id} className="flex items-center justify-between p-2 rounded bg-muted/30 text-xs">
+                                <span className="truncate">{overlay.text}</span>
+                                <button onClick={() => removeTextOverlay(overlay.id)} className="text-red-400 hover:text-red-500">
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Stickers & Emojis */}
+                    <div className="pt-4 border-t border-border/30">
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <Sticker className="w-4 h-4 text-primary" />
+                        Stickers & Emoji
+                      </h4>
+                      <div className="grid grid-cols-6 gap-1">
+                        {['😀', '😎', '❤️', '⭐', '🔥', '💯', '✨', '🎉', '👑', '🌟', '💖', '🎨', '🌈', '🦋', '🌸', '💎', '🎭', '🎪', '🎯', '🏆', '💫', '🌺', '🍀', '🎵'].map((emoji) => (
+                          <button
+                            key={emoji}
+                            onClick={() => addSticker(emoji)}
+                            className="p-2 text-xl hover:scale-125 transition-transform hover:bg-muted/50 rounded"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                      {stickers.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {stickers.map((sticker) => (
+                            <button 
+                              key={sticker.id} 
+                              onClick={() => removeSticker(sticker.id)}
+                              className="px-2 py-1 rounded bg-muted/30 text-sm hover:bg-red-500/20"
+                            >
+                              {sticker.emoji} ✕
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Frames */}
+                    <div className="pt-4 border-t border-border/30">
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <Frame className="w-4 h-4 text-primary" />
+                        Frames
+                      </h4>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          { name: 'None', value: null, preview: '⬜' },
+                          { name: 'Simple', value: 'simple', preview: '🖼️' },
+                          { name: 'Rounded', value: 'rounded', preview: '⭕' },
+                          { name: 'Polaroid', value: 'polaroid', preview: '📷' },
+                          { name: 'Film', value: 'film', preview: '🎞️' },
+                          { name: 'Vintage', value: 'vintage', preview: '🏛️' },
+                          { name: 'Neon', value: 'neon', preview: '💡' },
+                          { name: 'Shadow', value: 'shadow', preview: '🌑' },
+                        ].map((frame) => (
+                          <button
+                            key={frame.name}
+                            onClick={() => {
+                              setSelectedFrame(frame.value);
+                              toast.success(`${frame.name} frame applied!`);
+                            }}
+                            className={`p-2 rounded-lg text-center transition-all ${
+                              selectedFrame === frame.value 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'bg-muted/30 hover:bg-muted/50'
+                            }`}
+                          >
+                            <span className="text-lg block">{frame.preview}</span>
+                            <span className="text-[10px]">{frame.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'face' && (
                   <div className="space-y-4">
+                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <Smile className="w-4 h-4 text-primary" />
+                      Face Toning & Beauty
+                    </h4>
+                    
                     {[
-                      { label: 'Sepia', value: currentState.sepia, key: 'sepia' },
-                      { label: 'Grayscale', value: currentState.grayscale, key: 'grayscale' },
-                      { label: 'Invert', value: currentState.invert, key: 'invert' },
-                    ].map(({ label, value, key }) => (
+                      { label: 'Smoothness', value: currentState.smoothness, key: 'smoothness', max: 100 },
+                      { label: 'Glow', value: currentState.glow, key: 'glow', max: 100 },
+                      { label: 'Warmth', value: currentState.warmth, key: 'warmth', max: 100 },
+                    ].map(({ label, value, key, max }) => (
                       <div key={key}>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm font-medium">{label}</span>
@@ -389,29 +756,51 @@ const ImageEditor: React.FC = () => {
                           value={[value]}
                           onValueChange={([v]) => updateState({ [key]: v } as any)}
                           min={0}
-                          max={100}
+                          max={max}
                           step={1}
                           className="w-full"
                         />
                       </div>
                     ))}
-                    
+
                     <div className="pt-4 border-t border-border/30">
-                      <h4 className="text-sm font-medium mb-3">Quick Effects</h4>
+                      <h4 className="text-sm font-medium mb-3">Quick Presets</h4>
                       <div className="grid grid-cols-2 gap-2">
                         {[
-                          { name: 'Vignette', icon: Circle },
-                          { name: 'Grain', icon: Grid3X3 },
-                          { name: 'Glow', icon: Sparkles },
-                          { name: 'Sharpen', icon: Wand2 },
-                        ].map(({ name, icon: Icon }) => (
+                          { name: 'Natural', smoothness: 20, glow: 15, warmth: 10, emoji: '🌿' },
+                          { name: 'Soft Skin', smoothness: 50, glow: 30, warmth: 20, emoji: '✨' },
+                          { name: 'Studio', smoothness: 40, glow: 50, warmth: 15, emoji: '📸' },
+                          { name: 'Glamour', smoothness: 60, glow: 60, warmth: 30, emoji: '💄' },
+                        ].map((preset) => (
                           <button
-                            key={name}
-                            onClick={() => toast.info(`${name} effect coming soon!`)}
-                            className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 hover:bg-primary/20 transition-all text-sm"
+                            key={preset.name}
+                            onClick={() => {
+                              updateState({
+                                smoothness: preset.smoothness,
+                                glow: preset.glow,
+                                warmth: preset.warmth,
+                              });
+                              toast.success(`${preset.name} preset applied!`);
+                            }}
+                            className="p-3 rounded-xl bg-muted/30 hover:bg-primary/20 transition-all text-center"
                           >
-                            <Icon className="w-4 h-4" />
-                            {name}
+                            <span className="text-2xl block mb-1">{preset.emoji}</span>
+                            <span className="text-xs font-medium">{preset.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-border/30">
+                      <h4 className="text-sm font-medium mb-3">Lens Effects</h4>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['🔮 Blur', '⭐ Star', '❤️ Hearts', '🌈 Rainbow', '✨ Sparkle', '🎭 Mask'].map((lens) => (
+                          <button
+                            key={lens}
+                            onClick={() => toast.info(`${lens} lens coming soon!`)}
+                            className="p-2 rounded-lg bg-muted/30 hover:bg-primary/20 transition-all text-xs text-center"
+                          >
+                            {lens}
                           </button>
                         ))}
                       </div>
@@ -453,41 +842,28 @@ const ImageEditor: React.FC = () => {
                     </div>
 
                     <div className="pt-4 border-t border-border/30">
-                      <h4 className="text-sm font-medium mb-3">Color Picker</h4>
-                      <div className="flex items-center gap-3">
-                        <input 
-                          type="color" 
-                          value={selectedColor}
-                          onChange={(e) => setSelectedColor(e.target.value)}
-                          className="w-12 h-12"
-                        />
-                        <div className="flex-1">
-                          <div className="text-xs text-muted-foreground mb-1">Selected</div>
-                          <div className="text-sm font-mono">{selectedColor}</div>
-                        </div>
-                        <Button variant="ghost" size="sm" onClick={() => toast.info('Eyedropper coming soon!')}>
-                          <Pipette className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-border/30">
-                      <h4 className="text-sm font-medium mb-3">Drawing Tools</h4>
-                      <div className="grid grid-cols-4 gap-2">
+                      <h4 className="text-sm font-medium mb-3">Quick Effects</h4>
+                      <div className="grid grid-cols-2 gap-2">
                         {[
-                          { icon: Paintbrush, name: 'Brush' },
-                          { icon: Eraser, name: 'Eraser' },
-                          { icon: Type, name: 'Text' },
-                          { icon: Square, name: 'Shape' },
-                        ].map(({ icon: Icon, name }) => (
-                          <button
-                            key={name}
-                            onClick={() => toast.info(`${name} tool coming soon!`)}
-                            className="p-3 rounded-lg bg-muted/30 hover:bg-primary/20 transition-all"
-                            title={name}
+                          { label: 'Sepia', key: 'sepia', value: 50 },
+                          { label: 'B&W', key: 'grayscale', value: 100 },
+                          { label: 'Invert', key: 'invert', value: 100 },
+                          { label: 'Reset', key: 'reset', value: 0 },
+                        ].map(({ label, key, value }) => (
+                          <Button
+                            key={label}
+                            variant="glass"
+                            size="sm"
+                            onClick={() => {
+                              if (key === 'reset') {
+                                resetAll();
+                              } else {
+                                updateState({ [key]: value } as any);
+                              }
+                            }}
                           >
-                            <Icon className="w-5 h-5 mx-auto" />
-                          </button>
+                            {label}
+                          </Button>
                         ))}
                       </div>
                     </div>
@@ -536,8 +912,15 @@ const ImageEditor: React.FC = () => {
               </div>
 
               {/* Image Preview */}
-              <div className="editor-canvas rounded-2xl overflow-hidden">
-                <div className="relative w-full min-h-[300px] sm:min-h-[500px] flex items-center justify-center bg-muted/20 rounded-xl overflow-hidden">
+              <div className={`editor-canvas rounded-2xl overflow-hidden ${selectedFrame === 'simple' ? 'border-4 border-foreground' : ''} ${selectedFrame === 'rounded' ? 'rounded-[50px]' : ''} ${selectedFrame === 'polaroid' ? 'bg-white p-4 pb-16' : ''} ${selectedFrame === 'neon' ? 'ring-4 ring-primary shadow-[0_0_30px_rgba(0,212,255,0.5)]' : ''} ${selectedFrame === 'shadow' ? 'shadow-2xl' : ''}`}>
+                <div 
+                  className="relative w-full min-h-[300px] sm:min-h-[500px] flex items-center justify-center bg-muted/20 rounded-xl overflow-hidden"
+                  style={{
+                    backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }}
+                >
                   {showGrid && (
                     <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none z-10">
                       {Array.from({ length: 9 }).map((_, i) => (
@@ -554,6 +937,42 @@ const ImageEditor: React.FC = () => {
                       transform: getTransformString(),
                     }}
                   />
+                  
+                  {/* Text Overlays Display */}
+                  {textOverlays.map((overlay) => (
+                    <div
+                      key={overlay.id}
+                      className={`absolute pointer-events-none ${overlay.isMarquee ? 'animate-marquee' : ''}`}
+                      style={{
+                        left: `${overlay.x}%`,
+                        top: `${overlay.y}%`,
+                        fontSize: `${overlay.fontSize}px`,
+                        fontFamily: overlay.fontFamily,
+                        color: overlay.color,
+                        fontWeight: overlay.fontWeight,
+                        fontStyle: overlay.fontStyle,
+                        textDecoration: overlay.textDecoration,
+                        textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+                      }}
+                    >
+                      {overlay.text}
+                    </div>
+                  ))}
+                  
+                  {/* Stickers Display */}
+                  {stickers.map((sticker) => (
+                    <div
+                      key={sticker.id}
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${sticker.x}%`,
+                        top: `${sticker.y}%`,
+                        fontSize: `${sticker.size}px`,
+                      }}
+                    >
+                      {sticker.emoji}
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -562,6 +981,8 @@ const ImageEditor: React.FC = () => {
                 <div className="flex items-center gap-4">
                   <span>History: {historyIndex + 1}/{history.length}</span>
                   <span>Zoom: {zoom}%</span>
+                  <span>Texts: {textOverlays.length}</span>
+                  <span>Stickers: {stickers.length}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="px-2 py-1 rounded bg-primary/20 text-primary">AI-Enhanced</span>

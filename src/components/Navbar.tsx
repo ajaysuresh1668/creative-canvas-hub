@@ -13,6 +13,7 @@ const Navbar: React.FC = () => {
     { name: 'Video', href: '/video-editor', icon: Video, color: 'text-accent' },
     { name: 'Audio', href: '/audio-editor', icon: Music, color: 'text-success' },
     { name: 'Documents', href: '/document-editor', icon: FileType, color: 'text-warning' },
+    { name: 'Music', href: '/music-player', icon: Music, color: 'text-info' },
   ];
 
   return (

@@ -468,3 +468,46 @@ input[type="color"]::-webkit-color-swatch {
   border: none;
   border-radius: 6px;
 }
+
+/* Marquee animation for text overlays */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 10s linear infinite;
+}
+
+/* Film strip frame effect */
+.frame-film {
+  position: relative;
+}
+
+.frame-film::before,
+.frame-film::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 8px,
+    hsl(var(--foreground)) 8px,
+    hsl(var(--foreground)) 12px
+  );
+}
+
+.frame-film::before {
+  left: 0;
+}
+
+.frame-film::after {
+  right: 0;
+}
