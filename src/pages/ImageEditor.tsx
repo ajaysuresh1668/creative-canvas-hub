@@ -1,17 +1,18 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { 
   Image, Upload, Download, RotateCcw, RotateCw, FlipHorizontal, FlipVertical, 
-  Sun, Contrast, Droplets, Palette, Crop, Type, Square, Circle, Triangle,
-  Undo2, Redo2, ZoomIn, ZoomOut, Move, Eraser, Paintbrush, Wand2, 
-  Sparkles, Layers, Eye, EyeOff, Copy, Trash2, Save, Share2, ImagePlus,
-  SlidersHorizontal, Focus, Maximize2, Grid3X3, Pipette, Smile, Frame,
-  ImageMinus, Sticker, Heart, Star, Zap, Crown, Flower2, Music
+  Sun, Contrast, Droplets, Palette, Type, Eye, Focus, ImagePlus, Smile,
+  Undo2, Redo2, ZoomIn, ZoomOut,
+  Sparkles, Copy, Trash2,
+  SlidersHorizontal, Grid3X3, Frame,
+  ImageMinus, Sticker
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import FloatingLetters from '@/components/FloatingLetters';
 import EditorHeader from '@/components/EditorHeader';
+import { filterPresets, filterCategories, categoryDisplayNames, type FilterPreset } from '@/lib/filterPresets';
 
 interface TextOverlay {
   id: string;
@@ -356,41 +357,13 @@ const ImageEditor: React.FC = () => {
     }
   };
 
-  const presetFilters = [
-    { name: 'Original', brightness: 100, contrast: 100, saturation: 100, sepia: 0, grayscale: 0, hue: 0, emoji: '🎨' },
-    { name: 'Vivid', brightness: 110, contrast: 120, saturation: 140, sepia: 0, grayscale: 0, hue: 0, emoji: '🌈' },
-    { name: 'Warm', brightness: 105, contrast: 105, saturation: 110, sepia: 20, grayscale: 0, hue: 10, emoji: '🔥' },
-    { name: 'Cool', brightness: 100, contrast: 110, saturation: 90, sepia: 0, grayscale: 0, hue: 200, emoji: '❄️' },
-    { name: 'Vintage', brightness: 110, contrast: 85, saturation: 70, sepia: 40, grayscale: 0, hue: 0, emoji: '📷' },
-    { name: 'B&W', brightness: 105, contrast: 120, saturation: 0, sepia: 0, grayscale: 100, hue: 0, emoji: '⬛' },
-    { name: 'Dramatic', brightness: 95, contrast: 150, saturation: 80, sepia: 0, grayscale: 0, hue: 0, emoji: '🎭' },
-    { name: 'Fade', brightness: 115, contrast: 80, saturation: 80, sepia: 10, grayscale: 0, hue: 0, emoji: '🌫️' },
-    { name: 'Sunset', brightness: 105, contrast: 110, saturation: 130, sepia: 15, grayscale: 0, hue: 350, emoji: '🌅' },
-    { name: 'Night', brightness: 80, contrast: 130, saturation: 70, sepia: 0, grayscale: 0, hue: 230, emoji: '🌙' },
-    { name: 'Pop', brightness: 110, contrast: 130, saturation: 150, sepia: 0, grayscale: 0, hue: 0, emoji: '💥' },
-    { name: 'Matte', brightness: 110, contrast: 90, saturation: 85, sepia: 5, grayscale: 0, hue: 0, emoji: '🎬' },
-    // New attractive filters
-    { name: 'Cyberpunk', brightness: 95, contrast: 140, saturation: 160, sepia: 0, grayscale: 0, hue: 280, emoji: '🤖' },
-    { name: 'Neon', brightness: 110, contrast: 130, saturation: 180, sepia: 0, grayscale: 0, hue: 320, emoji: '💜' },
-    { name: 'Aurora', brightness: 105, contrast: 115, saturation: 130, sepia: 0, grayscale: 0, hue: 160, emoji: '🌌' },
-    { name: 'Golden', brightness: 108, contrast: 110, saturation: 120, sepia: 30, grayscale: 0, hue: 25, emoji: '✨' },
-    { name: 'Rose', brightness: 105, contrast: 100, saturation: 110, sepia: 0, grayscale: 0, hue: 340, emoji: '🌹' },
-    { name: 'Ocean', brightness: 100, contrast: 115, saturation: 120, sepia: 0, grayscale: 0, hue: 190, emoji: '🌊' },
-    { name: 'Forest', brightness: 95, contrast: 110, saturation: 100, sepia: 5, grayscale: 0, hue: 90, emoji: '🌲' },
-    { name: 'Retro', brightness: 115, contrast: 95, saturation: 80, sepia: 25, grayscale: 0, hue: 15, emoji: '📻' },
-    { name: 'Noir', brightness: 90, contrast: 140, saturation: 20, sepia: 10, grayscale: 60, hue: 0, emoji: '🕵️' },
-    { name: 'Candy', brightness: 112, contrast: 105, saturation: 140, sepia: 0, grayscale: 0, hue: 300, emoji: '🍭' },
-    { name: 'Electric', brightness: 100, contrast: 135, saturation: 170, sepia: 0, grayscale: 0, hue: 200, emoji: '⚡' },
-    { name: 'Dreamy', brightness: 118, contrast: 85, saturation: 95, sepia: 8, grayscale: 0, hue: 350, emoji: '💭' },
-    { name: 'Tropical', brightness: 108, contrast: 115, saturation: 145, sepia: 5, grayscale: 0, hue: 40, emoji: '🏝️' },
-    { name: 'Midnight', brightness: 75, contrast: 145, saturation: 90, sepia: 0, grayscale: 0, hue: 250, emoji: '🌃' },
-    { name: 'Chrome', brightness: 105, contrast: 130, saturation: 50, sepia: 0, grayscale: 30, hue: 0, emoji: '🔘' },
-    { name: 'Lava', brightness: 95, contrast: 140, saturation: 150, sepia: 10, grayscale: 0, hue: 5, emoji: '🌋' },
-    { name: 'Arctic', brightness: 115, contrast: 105, saturation: 70, sepia: 0, grayscale: 10, hue: 210, emoji: '🧊' },
-    { name: 'Pastel', brightness: 115, contrast: 90, saturation: 75, sepia: 0, grayscale: 0, hue: 0, emoji: '🎀' },
-  ];
+  const [selectedCategory, setSelectedCategory] = useState<FilterPreset['category']>('basic');
 
-  const applyPreset = (preset: typeof presetFilters[0]) => {
+  const getCategoryFilters = () => {
+    return filterPresets.filter(f => f.category === selectedCategory);
+  };
+
+  const applyPreset = (preset: FilterPreset) => {
     updateState({
       brightness: preset.brightness,
       contrast: preset.contrast,
@@ -504,8 +477,22 @@ const ImageEditor: React.FC = () => {
 
                 {activeTab === 'filters' && (
                   <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                    {/* Category selector */}
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-2 block">Category</label>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value as FilterPreset['category'])}
+                        className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/30 text-sm"
+                      >
+                        {filterCategories.map((cat) => (
+                          <option key={cat} value={cat}>{categoryDisplayNames[cat]}</option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div className="grid grid-cols-3 gap-2">
-                      {presetFilters.map((preset) => (
+                      {getCategoryFilters().map((preset) => (
                         <button
                           key={preset.name}
                           onClick={() => applyPreset(preset)}

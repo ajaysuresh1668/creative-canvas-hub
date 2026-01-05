@@ -1,16 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Video, Upload, Play, Pause, Volume2, VolumeX, SkipBack, SkipForward,
-  Scissors, Download, RotateCcw, FastForward, Rewind, Maximize, Minimize,
-  Settings, Layers, Type, Music, Image, Sparkles, Clock, SlidersHorizontal,
-  ChevronLeft, ChevronRight, Square, Circle, Zap, Film, Palette, Sun, Contrast,
-  Sticker, Trash2, Smile
+  Scissors, Download, RotateCcw, Maximize, Minimize,
+  Layers, Type, Sparkles, SlidersHorizontal,
+  ChevronLeft, ChevronRight, Film, Sticker, Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import FloatingLetters from '@/components/FloatingLetters';
 import EditorHeader from '@/components/EditorHeader';
+import { filterPresets, filterCategories, categoryDisplayNames, defaultFilter, type FilterPreset } from '@/lib/filterPresets';
 
 interface VideoFilters {
   brightness: number;
@@ -42,18 +42,9 @@ interface StickerOverlay {
   size: number;
 }
 
-const defaultFilters: VideoFilters = {
-  brightness: 100,
-  contrast: 100,
-  saturation: 100,
-  hue: 0,
-  blur: 0,
-  sepia: 0,
-  grayscale: 0,
-};
-
 const VideoEditor: React.FC = () => {
   const [video, setVideo] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(100);
@@ -63,10 +54,12 @@ const VideoEditor: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(100);
-  const [filters, setFilters] = useState<VideoFilters>(defaultFilters);
-  const [activeTab, setActiveTab] = useState<'timeline' | 'filters' | 'effects' | 'overlays' | 'audio'>('timeline');
+  const [filters, setFilters] = useState<VideoFilters>({ ...defaultFilter });
+  const [activeTab, setActiveTab] = useState<'timeline' | 'filters' | 'overlays' | 'audio'>('timeline');
   const [showTrimHandles, setShowTrimHandles] = useState(false);
   const [originalFileName, setOriginalFileName] = useState('edited-video');
+  const [selectedCategory, setSelectedCategory] = useState<FilterPreset['category']>('basic');
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false);
   
   // Text & Sticker overlays
   const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
@@ -82,98 +75,148 @@ const VideoEditor: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Handle video events
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
 
-    const updateTime = () => setCurrentTime(video.currentTime);
-    const updateDuration = () => {
-      setDuration(video.duration);
-      setTrimEnd(video.duration);
+    const handleTimeUpdate = () => {
+      setCurrentTime(videoEl.currentTime);
     };
-    const handleEnd = () => setIsPlaying(false);
 
-    video.addEventListener('timeupdate', updateTime);
-    video.addEventListener('loadedmetadata', updateDuration);
-    video.addEventListener('ended', handleEnd);
+    const handleLoadedMetadata = () => {
+      setDuration(videoEl.duration);
+      setTrimEnd(videoEl.duration);
+      setIsVideoLoaded(true);
+      toast.success('Video ready to edit!');
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+    };
+
+    const handleCanPlay = () => {
+      setIsVideoLoaded(true);
+    };
+
+    const handleError = (e: Event) => {
+      console.error('Video error:', e);
+      toast.error('Error loading video. Please try a different file.');
+      setIsVideoLoaded(false);
+    };
+
+    videoEl.addEventListener('timeupdate', handleTimeUpdate);
+    videoEl.addEventListener('loadedmetadata', handleLoadedMetadata);
+    videoEl.addEventListener('ended', handleEnded);
+    videoEl.addEventListener('canplay', handleCanPlay);
+    videoEl.addEventListener('error', handleError);
 
     return () => {
-      video.removeEventListener('timeupdate', updateTime);
-      video.removeEventListener('loadedmetadata', updateDuration);
-      video.removeEventListener('ended', handleEnd);
+      videoEl.removeEventListener('timeupdate', handleTimeUpdate);
+      videoEl.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      videoEl.removeEventListener('ended', handleEnded);
+      videoEl.removeEventListener('canplay', handleCanPlay);
+      videoEl.removeEventListener('error', handleError);
     };
   }, [video]);
 
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('video/')) {
+        toast.error('Please select a valid video file');
+        return;
+      }
+      
+      // Validate file size (max 500MB)
+      if (file.size > 500 * 1024 * 1024) {
+        toast.error('File size must be less than 500MB');
+        return;
+      }
+
+      setVideoFile(file);
       setOriginalFileName(file.name.replace(/\.[^/.]+$/, ''));
       const url = URL.createObjectURL(file);
       setVideo(url);
-      setFilters(defaultFilters);
-      toast.success('Video loaded successfully!');
+      setFilters({ ...defaultFilter });
+      setIsVideoLoaded(false);
+      setCurrentTime(0);
+      setIsPlaying(false);
+      toast.info('Loading video...');
     }
-  };
+  }, []);
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('video/')) {
+      if (file.size > 500 * 1024 * 1024) {
+        toast.error('File size must be less than 500MB');
+        return;
+      }
+      setVideoFile(file);
       setOriginalFileName(file.name.replace(/\.[^/.]+$/, ''));
       const url = URL.createObjectURL(file);
       setVideo(url);
-      setFilters(defaultFilters);
-      toast.success('Video loaded successfully!');
+      setFilters({ ...defaultFilter });
+      setIsVideoLoaded(false);
+      toast.info('Loading video...');
+    } else {
+      toast.error('Please drop a valid video file');
     }
-  };
+  }, []);
 
-  const togglePlay = () => {
-    if (videoRef.current) {
+  const togglePlay = useCallback(() => {
+    if (videoRef.current && isVideoLoaded) {
       if (isPlaying) {
         videoRef.current.pause();
       } else {
-        videoRef.current.play();
+        videoRef.current.play().catch(err => {
+          console.error('Play error:', err);
+          toast.error('Unable to play video');
+        });
       }
       setIsPlaying(!isPlaying);
     }
-  };
+  }, [isPlaying, isVideoLoaded]);
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     if (videoRef.current) {
       videoRef.current.muted = !isMuted;
       setIsMuted(!isMuted);
     }
-  };
+  }, [isMuted]);
 
-  const handleVolumeChange = (value: number[]) => {
+  const handleVolumeChange = useCallback((value: number[]) => {
     if (videoRef.current) {
       videoRef.current.volume = value[0] / 100;
       setVolume(value[0]);
     }
-  };
+  }, []);
 
-  const handleSeek = (value: number[]) => {
-    if (videoRef.current) {
+  const handleSeek = useCallback((value: number[]) => {
+    if (videoRef.current && isVideoLoaded) {
       videoRef.current.currentTime = value[0];
       setCurrentTime(value[0]);
     }
-  };
+  }, [isVideoLoaded]);
 
-  const skip = (seconds: number) => {
-    if (videoRef.current) {
+  const skip = useCallback((seconds: number) => {
+    if (videoRef.current && isVideoLoaded) {
       videoRef.current.currentTime = Math.max(0, Math.min(duration, videoRef.current.currentTime + seconds));
     }
-  };
+  }, [duration, isVideoLoaded]);
 
-  const changeSpeed = (speed: number) => {
+  const changeSpeed = useCallback((speed: number) => {
     if (videoRef.current) {
       videoRef.current.playbackRate = speed;
       setPlaybackSpeed(speed);
       toast.success(`Playback speed: ${speed}x`);
     }
-  };
+  }, []);
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     if (containerRef.current) {
       if (!isFullscreen) {
         containerRef.current.requestFullscreen?.();
@@ -182,9 +225,10 @@ const VideoEditor: React.FC = () => {
       }
       setIsFullscreen(!isFullscreen);
     }
-  };
+  }, [isFullscreen]);
 
   const formatTime = (time: number) => {
+    if (isNaN(time)) return '00:00';
     const mins = Math.floor(time / 60);
     const secs = Math.floor(time % 60);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
@@ -260,35 +304,29 @@ const VideoEditor: React.FC = () => {
     }
   };
 
-  const presetFilters = [
-    { name: 'Original', ...defaultFilters, emoji: '🎬' },
-    { name: 'Cinematic', brightness: 95, contrast: 120, saturation: 90, hue: 10, blur: 0, sepia: 10, grayscale: 0, emoji: '🎥' },
-    { name: 'Vintage', brightness: 110, contrast: 90, saturation: 70, hue: 0, blur: 0, sepia: 40, grayscale: 0, emoji: '📽️' },
-    { name: 'B&W Film', brightness: 105, contrast: 130, saturation: 0, hue: 0, blur: 0, sepia: 0, grayscale: 100, emoji: '⬛' },
-    { name: 'Warm', brightness: 105, contrast: 105, saturation: 120, hue: 15, blur: 0, sepia: 15, grayscale: 0, emoji: '🔥' },
-    { name: 'Cool', brightness: 100, contrast: 110, saturation: 90, hue: 200, blur: 0, sepia: 0, grayscale: 0, emoji: '❄️' },
-    { name: 'Dramatic', brightness: 90, contrast: 150, saturation: 80, hue: 0, blur: 0, sepia: 0, grayscale: 0, emoji: '🎭' },
-    { name: 'Dream', brightness: 115, contrast: 85, saturation: 110, hue: 330, blur: 1, sepia: 5, grayscale: 0, emoji: '💭' },
-    // New attractive video filters
-    { name: 'Blockbuster', brightness: 98, contrast: 125, saturation: 105, hue: 5, blur: 0, sepia: 8, grayscale: 0, emoji: '🎞️' },
-    { name: 'Horror', brightness: 80, contrast: 145, saturation: 60, hue: 180, blur: 0, sepia: 0, grayscale: 20, emoji: '👻' },
-    { name: 'Romance', brightness: 108, contrast: 95, saturation: 90, hue: 350, blur: 0.5, sepia: 12, grayscale: 0, emoji: '💕' },
-    { name: 'Action', brightness: 95, contrast: 140, saturation: 115, hue: 0, blur: 0, sepia: 0, grayscale: 0, emoji: '💥' },
-    { name: 'Sci-Fi', brightness: 90, contrast: 130, saturation: 140, hue: 200, blur: 0, sepia: 0, grayscale: 0, emoji: '🚀' },
-    { name: 'Western', brightness: 105, contrast: 110, saturation: 85, hue: 25, blur: 0, sepia: 35, grayscale: 0, emoji: '🤠' },
-    { name: 'Neon Night', brightness: 85, contrast: 140, saturation: 180, hue: 280, blur: 0, sepia: 0, grayscale: 0, emoji: '🌃' },
-    { name: 'Summer', brightness: 110, contrast: 105, saturation: 130, hue: 40, blur: 0, sepia: 8, grayscale: 0, emoji: '☀️' },
-    { name: 'Winter', brightness: 108, contrast: 110, saturation: 70, hue: 210, blur: 0, sepia: 0, grayscale: 15, emoji: '❄️' },
-    { name: 'Documentary', brightness: 100, contrast: 115, saturation: 95, hue: 0, blur: 0, sepia: 5, grayscale: 0, emoji: '📹' },
-    { name: 'Music Video', brightness: 105, contrast: 135, saturation: 160, hue: 320, blur: 0, sepia: 0, grayscale: 0, emoji: '🎵' },
-    { name: 'Anime', brightness: 108, contrast: 120, saturation: 145, hue: 0, blur: 0, sepia: 0, grayscale: 0, emoji: '🎌' },
-    { name: 'Vlog', brightness: 105, contrast: 108, saturation: 115, hue: 10, blur: 0, sepia: 5, grayscale: 0, emoji: '📱' },
-    { name: 'Thriller', brightness: 85, contrast: 140, saturation: 80, hue: 190, blur: 0, sepia: 5, grayscale: 10, emoji: '🔪' },
-    { name: 'Fantasy', brightness: 102, contrast: 115, saturation: 125, hue: 290, blur: 0.3, sepia: 0, grayscale: 0, emoji: '🧙' },
-    { name: 'Noir', brightness: 88, contrast: 150, saturation: 30, hue: 0, blur: 0, sepia: 15, grayscale: 50, emoji: '🕵️' },
-  ];
+  const applyFilter = (preset: FilterPreset) => {
+    setFilters({
+      brightness: preset.brightness,
+      contrast: preset.contrast,
+      saturation: preset.saturation,
+      hue: preset.hue,
+      blur: preset.blur,
+      sepia: preset.sepia,
+      grayscale: preset.grayscale,
+    });
+    toast.success(`${preset.name} filter applied!`);
+  };
+
+  const resetFilters = () => {
+    setFilters({ ...defaultFilter });
+    toast.success('Filters reset!');
+  };
 
   const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+
+  const getCategoryFilters = () => {
+    return filterPresets.filter(f => f.category === selectedCategory);
+  };
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -304,7 +342,7 @@ const VideoEditor: React.FC = () => {
           type="file"
           ref={fileInputRef}
           onChange={handleVideoUpload}
-          accept="video/*"
+          accept="video/mp4,video/webm,video/ogg,video/quicktime,video/x-msvideo"
           className="hidden"
         />
 
@@ -324,7 +362,7 @@ const VideoEditor: React.FC = () => {
                 Drag & drop or click to select
               </p>
               <p className="text-xs text-muted-foreground/60">
-                Supports MP4, WebM, MOV, AVI
+                Supports MP4, WebM, MOV, AVI (max 500MB)
               </p>
             </div>
           </div>
@@ -366,7 +404,7 @@ const VideoEditor: React.FC = () => {
                             value={[trimStart]}
                             onValueChange={([v]) => setTrimStart(Math.min(v, trimEnd - 1))}
                             min={0}
-                            max={duration}
+                            max={duration || 100}
                             step={0.1}
                           />
                         </div>
@@ -378,7 +416,7 @@ const VideoEditor: React.FC = () => {
                             value={[trimEnd]}
                             onValueChange={([v]) => setTrimEnd(Math.max(v, trimStart + 1))}
                             min={0}
-                            max={duration}
+                            max={duration || 100}
                             step={0.1}
                           />
                         </div>
@@ -391,7 +429,7 @@ const VideoEditor: React.FC = () => {
 
                     <div className="pt-4 border-t border-border/30">
                       <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-primary" />
+                        <SlidersHorizontal className="w-4 h-4 text-primary" />
                         Playback Speed
                       </h4>
                       <div className="grid grid-cols-4 gap-1">
@@ -410,40 +448,31 @@ const VideoEditor: React.FC = () => {
                         ))}
                       </div>
                     </div>
-
-                    <div className="pt-4 border-t border-border/30">
-                      <h4 className="text-sm font-medium mb-3">Add Elements</h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { icon: Type, name: 'Text' },
-                          { icon: Image, name: 'Image' },
-                          { icon: Music, name: 'Audio' },
-                          { icon: Layers, name: 'Overlay' },
-                        ].map(({ icon: Icon, name }) => (
-                          <button
-                            key={name}
-                            onClick={() => toast.info(`${name} overlay coming soon!`)}
-                            className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 hover:bg-primary/20 transition-all text-sm"
-                          >
-                            <Icon className="w-4 h-4" />
-                            {name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 )}
 
                 {activeTab === 'filters' && (
                   <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                    {/* Category selector */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Filter Category</h4>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value as FilterPreset['category'])}
+                        className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/30 text-sm"
+                      >
+                        {filterCategories.map((cat) => (
+                          <option key={cat} value={cat}>{categoryDisplayNames[cat]}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filter grid */}
                     <div className="grid grid-cols-2 gap-2">
-                      {presetFilters.map((preset) => (
+                      {getCategoryFilters().map((preset) => (
                         <button
                           key={preset.name}
-                          onClick={() => {
-                            setFilters(preset);
-                            toast.success(`${preset.name} filter applied!`);
-                          }}
+                          onClick={() => applyFilter(preset)}
                           className="p-2 rounded-xl bg-muted/30 hover:bg-primary/20 hover:scale-105 transition-all text-center group relative overflow-hidden border border-transparent hover:border-primary/40"
                         >
                           <div className="w-full aspect-video rounded-lg bg-gradient-to-br from-muted via-accent/10 to-muted/50 mb-1 group-hover:scale-110 transition-transform overflow-hidden flex items-center justify-center">
@@ -455,10 +484,14 @@ const VideoEditor: React.FC = () => {
                             </div>
                           </div>
                           <span className="text-xs font-medium">{preset.name}</span>
-                          <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                         </button>
                       ))}
                     </div>
+
+                    <Button variant="glass" size="sm" className="w-full" onClick={resetFilters}>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Reset Filters
+                    </Button>
                   </div>
                 )}
 
@@ -491,6 +524,8 @@ const VideoEditor: React.FC = () => {
                               <option value="Impact">Impact</option>
                               <option value="Comic Sans MS">Comic Sans</option>
                               <option value="Courier New">Courier</option>
+                              <option value="Verdana">Verdana</option>
+                              <option value="Times New Roman">Times</option>
                             </select>
                           </div>
                           <div>
@@ -583,15 +618,19 @@ const VideoEditor: React.FC = () => {
                     <div className="pt-4 border-t border-border/30">
                       <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-primary" />
-                        Effects
+                        Manual Adjustments
                       </h4>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-3">
                         {[
                           { label: 'Brightness', key: 'brightness', value: filters.brightness, min: 50, max: 150 },
                           { label: 'Contrast', key: 'contrast', value: filters.contrast, min: 50, max: 150 },
+                          { label: 'Saturation', key: 'saturation', value: filters.saturation, min: 0, max: 200 },
                         ].map(({ label, key, value, min, max }) => (
-                          <div key={key} className="space-y-1">
-                            <label className="text-xs text-muted-foreground">{label}</label>
+                          <div key={key}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span>{label}</span>
+                              <span className="text-muted-foreground">{value}%</span>
+                            </div>
                             <Slider
                               value={[value]}
                               onValueChange={([v]) => setFilters(prev => ({ ...prev, [key]: v }))}
@@ -630,17 +669,9 @@ const VideoEditor: React.FC = () => {
                     <div className="pt-4 border-t border-border/30">
                       <h4 className="text-sm font-medium mb-3">Audio Options</h4>
                       <div className="space-y-2">
-                        <Button variant="glass" size="sm" className="w-full justify-start" onClick={() => toast.info('Coming soon!')}>
-                          <Music className="w-4 h-4 mr-2" />
-                          Add Background Music
-                        </Button>
                         <Button variant="glass" size="sm" className="w-full justify-start" onClick={() => setIsMuted(!isMuted)}>
                           {isMuted ? <VolumeX className="w-4 h-4 mr-2" /> : <Volume2 className="w-4 h-4 mr-2" />}
                           {isMuted ? 'Unmute Audio' : 'Mute Audio'}
-                        </Button>
-                        <Button variant="glass" size="sm" className="w-full justify-start" onClick={() => toast.info('Coming soon!')}>
-                          <SlidersHorizontal className="w-4 h-4 mr-2" />
-                          Audio Equalizer
                         </Button>
                       </div>
                     </div>
@@ -660,7 +691,19 @@ const VideoEditor: React.FC = () => {
                     className="w-full max-h-[60vh] object-contain"
                     style={{ filter: getFilterString() }}
                     onClick={togglePlay}
+                    playsInline
+                    preload="metadata"
                   />
+                  
+                  {/* Loading indicator */}
+                  {!isVideoLoaded && video && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <div className="text-center">
+                        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                        <p className="text-sm text-muted-foreground">Loading video...</p>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Text Overlays Display */}
                   {textOverlays.map((overlay) => (
@@ -699,7 +742,7 @@ const VideoEditor: React.FC = () => {
                   ))}
                   
                   {/* Play/Pause overlay */}
-                  {!isPlaying && (
+                  {!isPlaying && isVideoLoaded && (
                     <button
                       onClick={togglePlay}
                       className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors"
@@ -721,15 +764,16 @@ const VideoEditor: React.FC = () => {
                       max={duration || 100}
                       step={0.1}
                       className="w-full"
+                      disabled={!isVideoLoaded}
                     />
-                    {showTrimHandles && (
+                    {showTrimHandles && duration > 0 && (
                       <>
                         <div 
-                          className="absolute top-0 h-2 bg-primary/30 rounded-l"
+                          className="absolute top-0 h-2 bg-primary/30 rounded-l pointer-events-none"
                           style={{ left: 0, width: `${(trimStart / duration) * 100}%` }}
                         />
                         <div 
-                          className="absolute top-0 h-2 bg-primary/30 rounded-r"
+                          className="absolute top-0 h-2 bg-primary/30 rounded-r pointer-events-none"
                           style={{ left: `${(trimEnd / duration) * 100}%`, right: 0 }}
                         />
                       </>
@@ -744,19 +788,19 @@ const VideoEditor: React.FC = () => {
                 {/* Controls */}
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-1 sm:gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => skip(-10)}>
+                    <Button variant="ghost" size="sm" onClick={() => skip(-10)} disabled={!isVideoLoaded}>
                       <SkipBack className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => skip(-5)}>
+                    <Button variant="ghost" size="sm" onClick={() => skip(-5)} disabled={!isVideoLoaded}>
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
-                    <Button variant="glow" size="sm" onClick={togglePlay} className="px-4">
+                    <Button variant="glow" size="sm" onClick={togglePlay} className="px-4" disabled={!isVideoLoaded}>
                       {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => skip(5)}>
+                    <Button variant="ghost" size="sm" onClick={() => skip(5)} disabled={!isVideoLoaded}>
                       <ChevronRight className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => skip(10)}>
+                    <Button variant="ghost" size="sm" onClick={() => skip(10)} disabled={!isVideoLoaded}>
                       <SkipForward className="w-4 h-4" />
                     </Button>
                   </div>
@@ -783,33 +827,33 @@ const VideoEditor: React.FC = () => {
                     <Button variant="glass" size="sm" onClick={() => fileInputRef.current?.click()}>
                       <Upload className="w-4 h-4 mr-1" /> New
                     </Button>
-                    <Button variant="glow" size="sm" onClick={downloadVideo}>
+                    <Button variant="glow" size="sm" onClick={downloadVideo} disabled={!isVideoLoaded}>
                       <Download className="w-4 h-4 mr-1" /> Export
                     </Button>
                   </div>
                 </div>
               </div>
 
-              {/* Timeline Track */}
+              {/* Video Info */}
               <div className="mt-4 glass-card rounded-xl p-4">
-                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-primary" />
-                  Timeline
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
-                    <Video className="w-4 h-4 text-primary" />
-                    <div className="flex-1 h-8 bg-gradient-to-r from-primary/40 to-secondary/40 rounded relative overflow-hidden">
-                      <div 
-                        className="absolute top-0 bottom-0 bg-primary/50"
-                        style={{ left: `${(trimStart / duration) * 100}%`, width: `${((trimEnd - trimStart) / duration) * 100}%` }}
-                      />
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center">
+                      <Video className="w-6 h-6 text-primary" />
                     </div>
-                    <span className="text-xs text-muted-foreground">{formatTime(duration)}</span>
+                    <div>
+                      <h4 className="font-medium">{originalFileName}</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Duration: {formatTime(duration)} • Speed: {playbackSpeed}x
+                        {videoFile && ` • Size: ${(videoFile.size / (1024 * 1024)).toFixed(1)}MB`}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/20 border border-dashed border-border/50">
-                    <Music className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Drop audio track here</span>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 rounded bg-primary/20 text-primary text-xs">
+                      {isVideoLoaded ? 'Ready' : 'Loading...'}
+                    </span>
+                    <span className="px-2 py-1 rounded bg-secondary/20 text-secondary text-xs">100+ Filters</span>
                   </div>
                 </div>
               </div>
