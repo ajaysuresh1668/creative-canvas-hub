@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
-import FloatingLetters from '@/components/FloatingLetters';
+import BackgroundEffects from '@/components/BackgroundEffects';
 import EditorHeader from '@/components/EditorHeader';
 import { filterPresets, filterCategories, categoryDisplayNames, type FilterPreset } from '@/lib/filterPresets';
 
@@ -377,7 +377,7 @@ const ImageEditor: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      <FloatingLetters />
+      <BackgroundEffects />
       <EditorHeader 
         title="Image Editor" 
         subtitle="Professional editing tools"

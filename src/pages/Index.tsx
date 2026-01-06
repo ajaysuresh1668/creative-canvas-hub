@@ -1,6 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
-import FloatingLetters from '@/components/FloatingLetters';
+import BackgroundEffects from '@/components/BackgroundEffects';
 import Navbar from '@/components/Navbar';
 import HeroSection from '@/components/HeroSection';
 import FeaturesSection from '@/components/FeaturesSection';
@@ -22,7 +22,7 @@ const Index: React.FC = () => {
       </Helmet>
 
       <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
-        <FloatingLetters />
+        <BackgroundEffects />
         <Navbar />
         
         <main>

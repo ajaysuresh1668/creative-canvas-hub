@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import FloatingLetters from '@/components/FloatingLetters';
+import BackgroundEffects from '@/components/BackgroundEffects';
 import EditorHeader from '@/components/EditorHeader';
 
 interface TextStats {
@@ -236,7 +236,7 @@ Best,
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      <FloatingLetters />
+      <BackgroundEffects />
       <EditorHeader 
         title="Text Editor" 
         subtitle="Rich text editing"

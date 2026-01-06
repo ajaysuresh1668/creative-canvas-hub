@@ -8,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
-import FloatingLetters from '@/components/FloatingLetters';
+import BackgroundEffects from '@/components/BackgroundEffects';
 import EditorHeader from '@/components/EditorHeader';
 
 interface AudioEffects {
@@ -262,7 +262,7 @@ const AudioEditor: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      <FloatingLetters />
+      <BackgroundEffects />
       <EditorHeader 
         title="Audio Editor" 
         subtitle="Professional audio editing"
