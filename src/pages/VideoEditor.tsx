@@ -8,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
-import FloatingLetters from '@/components/FloatingLetters';
+import BackgroundEffects from '@/components/BackgroundEffects';
 import EditorHeader from '@/components/EditorHeader';
 import { filterPresets, filterCategories, categoryDisplayNames, defaultFilter, type FilterPreset } from '@/lib/filterPresets';
 
@@ -330,7 +330,7 @@ const VideoEditor: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      <FloatingLetters />
+      <BackgroundEffects />
       <EditorHeader 
         title="Video Editor" 
         subtitle="Professional video editing"

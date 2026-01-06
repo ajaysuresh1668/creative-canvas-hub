@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import FloatingLetters from '@/components/FloatingLetters';
+import BackgroundEffects from '@/components/BackgroundEffects';
 import EditorHeader from '@/components/EditorHeader';
 
 const DocumentEditor: React.FC = () => {
@@ -185,7 +185,7 @@ ${documentContent.split('\n').map(p => `<p>${p || '&nbsp;'}</p>`).join('\n')}
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      <FloatingLetters />
+      <BackgroundEffects />
       <EditorHeader 
         title="Document Editor" 
         subtitle="Edit and process documents"
