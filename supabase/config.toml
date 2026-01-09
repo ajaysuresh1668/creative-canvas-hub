@@ -1,0 +1,7 @@
+project_id = "sscnvcegayztvqdhomjd"
+
+[functions.ai-image-enhance]
+verify_jwt = false
+
+[functions.ai-generate-image]
+verify_jwt = false
