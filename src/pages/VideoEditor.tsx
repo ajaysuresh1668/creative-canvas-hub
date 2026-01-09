@@ -3,7 +3,8 @@ import {
   Video, Upload, Play, Pause, Volume2, VolumeX, SkipBack, SkipForward,
   Scissors, Download, RotateCcw, Maximize, Minimize,
   Layers, Type, Sparkles, SlidersHorizontal,
-  ChevronLeft, ChevronRight, Film, Sticker, Trash2
+  ChevronLeft, ChevronRight, Film, Sticker, Trash2,
+  Brain, Wand2, Palette, Zap, Loader2, Camera, Eye, Sun, Contrast
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -11,6 +12,7 @@ import { toast } from 'sonner';
 import BackgroundEffects from '@/components/BackgroundEffects';
 import EditorHeader from '@/components/EditorHeader';
 import { filterPresets, filterCategories, categoryDisplayNames, defaultFilter, type FilterPreset } from '@/lib/filterPresets';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VideoFilters {
   brightness: number;
@@ -55,7 +57,7 @@ const VideoEditor: React.FC = () => {
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(100);
   const [filters, setFilters] = useState<VideoFilters>({ ...defaultFilter });
-  const [activeTab, setActiveTab] = useState<'timeline' | 'filters' | 'overlays' | 'audio'>('timeline');
+  const [activeTab, setActiveTab] = useState<'ai' | 'timeline' | 'filters' | 'overlays' | 'audio'>('ai');
   const [showTrimHandles, setShowTrimHandles] = useState(false);
   const [originalFileName, setOriginalFileName] = useState('edited-video');
   const [selectedCategory, setSelectedCategory] = useState<FilterPreset['category']>('basic');
@@ -70,10 +72,228 @@ const VideoEditor: React.FC = () => {
   const [textFontFamily, setTextFontFamily] = useState('Arial');
   const [textFontWeight, setTextFontWeight] = useState('normal');
   const [isMarquee, setIsMarquee] = useState(false);
+
+  // AI Features
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+  const [aiStylePrompt, setAiStylePrompt] = useState('');
+  const [aiDescription, setAiDescription] = useState('');
+  const [sceneAnalysis, setSceneAnalysis] = useState<any>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Capture current frame for AI analysis
+  const captureFrame = useCallback((): string | null => {
+    if (!videoRef.current || !canvasRef.current) return null;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return null;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    return canvas.toDataURL('image/jpeg', 0.8);
+  }, []);
+
+  // AI Enhancement Functions
+  const aiAutoEnhance = async () => {
+    if (!video) {
+      toast.error('Please upload a video first');
+      return;
+    }
+    
+    setIsAiProcessing(true);
+    toast.info('AI is analyzing your video...');
+    
+    try {
+      const frameBase64 = captureFrame();
+      
+      const { data, error } = await supabase.functions.invoke('ai-video-enhance', {
+        body: { action: 'enhance', frameBase64 }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.result && !data.result.raw) {
+        setFilters({
+          brightness: data.result.brightness || filters.brightness,
+          contrast: data.result.contrast || filters.contrast,
+          saturation: data.result.saturation || filters.saturation,
+          hue: data.result.hue || filters.hue,
+          sepia: data.result.sepia || filters.sepia,
+          grayscale: filters.grayscale,
+          blur: filters.blur,
+        });
+        setAiDescription(data.result.description || 'Video enhanced!');
+        toast.success('AI enhancement applied!');
+      } else {
+        toast.info(data.result?.description || 'AI processed your video');
+      }
+    } catch (error) {
+      console.error('AI enhance error:', error);
+      toast.error('Failed to enhance video. Please try again.');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const aiColorGrade = async () => {
+    if (!aiStylePrompt.trim()) {
+      toast.error('Please enter a color grading style');
+      return;
+    }
+    
+    setIsAiProcessing(true);
+    toast.info(`Applying ${aiStylePrompt} color grade...`);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-video-enhance', {
+        body: { action: 'color_grade', prompt: aiStylePrompt }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.result && !data.result.raw) {
+        setFilters({
+          brightness: data.result.brightness || filters.brightness,
+          contrast: data.result.contrast || filters.contrast,
+          saturation: data.result.saturation || filters.saturation,
+          hue: data.result.hue || filters.hue,
+          sepia: data.result.sepia || filters.sepia,
+          grayscale: data.result.grayscale || filters.grayscale,
+          blur: filters.blur,
+        });
+        setAiDescription(data.result.description || `${aiStylePrompt} color grade applied!`);
+        toast.success('Color grading complete!');
+      }
+    } catch (error) {
+      console.error('Color grade error:', error);
+      toast.error('Failed to apply color grade. Please try again.');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const aiSceneAnalysis = async () => {
+    if (!video) {
+      toast.error('Please upload a video first');
+      return;
+    }
+    
+    setIsAiProcessing(true);
+    toast.info('AI is analyzing the scene...');
+    
+    try {
+      const frameBase64 = captureFrame();
+      
+      const { data, error } = await supabase.functions.invoke('ai-video-enhance', {
+        body: { action: 'scene_analysis', frameBase64 }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.result && !data.result.raw) {
+        setSceneAnalysis(data.result);
+        setAiDescription(data.result.description || 'Scene analyzed!');
+        toast.success('Scene analysis complete!');
+      }
+    } catch (error) {
+      console.error('Scene analysis error:', error);
+      toast.error('Failed to analyze scene. Please try again.');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const aiAutoCorrect = async () => {
+    if (!video) {
+      toast.error('Please upload a video first');
+      return;
+    }
+    
+    setIsAiProcessing(true);
+    toast.info('AI is auto-correcting colors...');
+    
+    try {
+      const frameBase64 = captureFrame();
+      
+      const { data, error } = await supabase.functions.invoke('ai-video-enhance', {
+        body: { action: 'auto_correct', frameBase64 }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.result && !data.result.raw) {
+        setFilters({
+          ...filters,
+          brightness: data.result.brightness || filters.brightness,
+          contrast: data.result.contrast || filters.contrast,
+          saturation: data.result.saturation || filters.saturation,
+          hue: data.result.hue || filters.hue,
+        });
+        setAiDescription(data.result.description || 'Colors corrected!');
+        toast.success('Auto correction applied!');
+      }
+    } catch (error) {
+      console.error('Auto correct error:', error);
+      toast.error('Failed to auto-correct. Please try again.');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const aiStyleTransfer = async (style: string) => {
+    setIsAiProcessing(true);
+    toast.info(`Applying ${style} style...`);
+    
+    try {
+      const frameBase64 = captureFrame();
+      
+      const { data, error } = await supabase.functions.invoke('ai-video-enhance', {
+        body: { action: 'style_transfer', prompt: style, frameBase64 }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.result && !data.result.raw) {
+        setFilters({
+          brightness: data.result.brightness || filters.brightness,
+          contrast: data.result.contrast || filters.contrast,
+          saturation: data.result.saturation || filters.saturation,
+          hue: data.result.hue || filters.hue,
+          sepia: data.result.sepia || filters.sepia,
+          grayscale: data.result.grayscale || filters.grayscale,
+          blur: filters.blur,
+        });
+        setAiDescription(data.result.description || `${style} style applied!`);
+        toast.success('Style transfer complete!');
+      }
+    } catch (error) {
+      console.error('Style transfer error:', error);
+      toast.error('Failed to apply style. Please try again.');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const applySceneRecommendations = () => {
+    if (!sceneAnalysis) return;
+    
+    setFilters({
+      ...filters,
+      brightness: sceneAnalysis.brightness || filters.brightness,
+      contrast: sceneAnalysis.contrast || filters.contrast,
+      saturation: sceneAnalysis.saturation || filters.saturation,
+      hue: sceneAnalysis.hue || filters.hue,
+    });
+    toast.success('Scene recommendations applied!');
+  };
 
   // Handle video events
   useEffect(() => {
@@ -123,13 +343,11 @@ const VideoEditor: React.FC = () => {
   const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('video/')) {
         toast.error('Please select a valid video file');
         return;
       }
       
-      // Validate file size (max 500MB)
       if (file.size > 500 * 1024 * 1024) {
         toast.error('File size must be less than 500MB');
         return;
@@ -143,6 +361,8 @@ const VideoEditor: React.FC = () => {
       setIsVideoLoaded(false);
       setCurrentTime(0);
       setIsPlaying(false);
+      setSceneAnalysis(null);
+      setAiDescription('');
       toast.info('Loading video...');
     }
   }, []);
@@ -161,6 +381,8 @@ const VideoEditor: React.FC = () => {
       setVideo(url);
       setFilters({ ...defaultFilter });
       setIsVideoLoaded(false);
+      setSceneAnalysis(null);
+      setAiDescription('');
       toast.info('Loading video...');
     } else {
       toast.error('Please drop a valid video file');
@@ -319,6 +541,8 @@ const VideoEditor: React.FC = () => {
 
   const resetFilters = () => {
     setFilters({ ...defaultFilter });
+    setAiDescription('');
+    setSceneAnalysis(null);
     toast.success('Filters reset!');
   };
 
@@ -328,14 +552,28 @@ const VideoEditor: React.FC = () => {
     return filterPresets.filter(f => f.category === selectedCategory);
   };
 
+  const aiStyles = [
+    { name: 'Cinematic', icon: '🎬' },
+    { name: 'Vintage', icon: '📼' },
+    { name: 'Noir', icon: '🖤' },
+    { name: 'Neon', icon: '💜' },
+    { name: 'Warm Summer', icon: '☀️' },
+    { name: 'Cold Winter', icon: '❄️' },
+    { name: 'Hollywood', icon: '⭐' },
+    { name: 'Documentary', icon: '📹' },
+  ];
+
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       <BackgroundEffects />
       <EditorHeader 
         title="Video Editor" 
-        subtitle="Professional video editing"
+        subtitle="AI-Powered video editing"
         icon={<Video className="w-5 h-5 text-primary" />}
       />
+
+      {/* Hidden canvas for frame capture */}
+      <canvas ref={canvasRef} className="hidden" />
 
       <main className="relative z-10 container mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <input
@@ -364,6 +602,10 @@ const VideoEditor: React.FC = () => {
               <p className="text-xs text-muted-foreground/60">
                 Supports MP4, WebM, MOV, AVI (max 500MB)
               </p>
+              <div className="mt-6 flex items-center justify-center gap-2">
+                <Brain className="w-5 h-5 text-primary" />
+                <span className="text-sm text-primary font-medium">AI-Powered Enhancement Available</span>
+              </div>
             </div>
           </div>
         ) : (
@@ -373,20 +615,183 @@ const VideoEditor: React.FC = () => {
               <div className="editor-sidebar rounded-2xl">
                 {/* Tabs */}
                 <div className="flex gap-1 p-1 bg-muted/30 rounded-xl mb-4 overflow-x-auto">
-                  {(['timeline', 'filters', 'overlays', 'audio'] as const).map((tab) => (
+                  {(['ai', 'timeline', 'filters', 'overlays', 'audio'] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                      className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center justify-center gap-1 ${
                         activeTab === tab 
                           ? 'bg-primary text-primary-foreground' 
                           : 'hover:bg-muted/50'
                       }`}
                     >
+                      {tab === 'ai' && <Brain className="w-3 h-3" />}
                       {tab.charAt(0).toUpperCase() + tab.slice(1)}
                     </button>
                   ))}
                 </div>
+
+                {/* AI Tab */}
+                {activeTab === 'ai' && (
+                  <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                    {/* AI Auto Enhance */}
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30">
+                      <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
+                        <Wand2 className="w-4 h-4 text-primary" />
+                        AI Auto Enhance
+                      </h4>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Let AI analyze and enhance your video automatically
+                      </p>
+                      <Button 
+                        variant="glow" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={aiAutoEnhance}
+                        disabled={isAiProcessing || !isVideoLoaded}
+                      >
+                        {isAiProcessing ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+                        ) : (
+                          <><Sparkles className="w-4 h-4 mr-2" /> Auto Enhance</>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* AI Scene Analysis */}
+                    <div className="p-4 rounded-xl bg-muted/30 border border-border/30">
+                      <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-primary" />
+                        Scene Analysis
+                      </h4>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        AI analyzes scene type, lighting, and mood
+                      </p>
+                      <Button 
+                        variant="glass" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={aiSceneAnalysis}
+                        disabled={isAiProcessing || !isVideoLoaded}
+                      >
+                        <Camera className="w-4 h-4 mr-2" /> Analyze Scene
+                      </Button>
+                      
+                      {sceneAnalysis && (
+                        <div className="mt-3 p-3 rounded-lg bg-background/50 border border-primary/20 space-y-2">
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {sceneAnalysis.scene_type && (
+                              <div>
+                                <span className="text-muted-foreground">Scene:</span>
+                                <span className="ml-1 font-medium">{sceneAnalysis.scene_type}</span>
+                              </div>
+                            )}
+                            {sceneAnalysis.lighting && (
+                              <div>
+                                <span className="text-muted-foreground">Light:</span>
+                                <span className="ml-1 font-medium">{sceneAnalysis.lighting}</span>
+                              </div>
+                            )}
+                            {sceneAnalysis.mood && (
+                              <div className="col-span-2">
+                                <span className="text-muted-foreground">Mood:</span>
+                                <span className="ml-1 font-medium">{sceneAnalysis.mood}</span>
+                              </div>
+                            )}
+                          </div>
+                          <Button 
+                            variant="glass" 
+                            size="sm" 
+                            className="w-full mt-2"
+                            onClick={applySceneRecommendations}
+                          >
+                            Apply Recommendations
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* AI Color Grading */}
+                    <div className="p-4 rounded-xl bg-muted/30 border border-border/30">
+                      <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
+                        <Palette className="w-4 h-4 text-primary" />
+                        AI Color Grading
+                      </h4>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Professional color grading with AI
+                      </p>
+                      <div className="flex gap-2 mb-3">
+                        <input
+                          type="text"
+                          value={aiStylePrompt}
+                          onChange={(e) => setAiStylePrompt(e.target.value)}
+                          placeholder="e.g., cinematic, teal and orange..."
+                          className="flex-1 px-3 py-2 rounded-lg bg-background/50 border border-border/30 text-sm focus:outline-none focus:border-primary/50"
+                        />
+                      </div>
+                      <Button 
+                        variant="glass" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={aiColorGrade}
+                        disabled={isAiProcessing || !aiStylePrompt.trim()}
+                      >
+                        Apply Color Grade
+                      </Button>
+                    </div>
+
+                    {/* Quick AI Styles */}
+                    <div className="p-4 rounded-xl bg-muted/30 border border-border/30">
+                      <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-primary" />
+                        Quick AI Styles
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {aiStyles.map((style) => (
+                          <button
+                            key={style.name}
+                            onClick={() => aiStyleTransfer(style.name)}
+                            disabled={isAiProcessing || !isVideoLoaded}
+                            className="p-2 rounded-lg bg-muted/50 hover:bg-primary/20 text-xs font-medium transition-all hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <span>{style.icon}</span>
+                            <span>{style.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Quick AI Tools */}
+                    <div className="p-4 rounded-xl bg-muted/30 border border-border/30">
+                      <h4 className="text-sm font-bold mb-3">Quick Tools</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button 
+                          variant="glass" 
+                          size="sm"
+                          onClick={aiAutoCorrect}
+                          disabled={isAiProcessing || !isVideoLoaded}
+                        >
+                          <Sun className="w-4 h-4 mr-1" /> Auto Fix
+                        </Button>
+                        <Button 
+                          variant="glass" 
+                          size="sm"
+                          onClick={resetFilters}
+                        >
+                          <RotateCcw className="w-4 h-4 mr-1" /> Reset
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* AI Description */}
+                    {aiDescription && (
+                      <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-xs">
+                        <span className="font-medium text-primary">AI Result: </span>
+                        {aiDescription}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {activeTab === 'timeline' && (
                   <div className="space-y-4">
@@ -453,13 +858,45 @@ const VideoEditor: React.FC = () => {
 
                 {activeTab === 'filters' && (
                   <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-                    {/* Category selector */}
+                    {/* Manual Adjustments */}
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Filter Category</h4>
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <SlidersHorizontal className="w-4 h-4 text-primary" />
+                        Manual Adjustments
+                      </h4>
+                      <div className="space-y-3">
+                        {[
+                          { label: 'Brightness', key: 'brightness', value: filters.brightness, min: 50, max: 150, icon: Sun },
+                          { label: 'Contrast', key: 'contrast', value: filters.contrast, min: 50, max: 150, icon: Contrast },
+                          { label: 'Saturation', key: 'saturation', value: filters.saturation, min: 0, max: 200, icon: Palette },
+                        ].map(({ label, key, value, min, max, icon: Icon }) => (
+                          <div key={key}>
+                            <div className="flex justify-between items-center text-xs mb-1">
+                              <span className="flex items-center gap-1">
+                                <Icon className="w-3 h-3 text-primary" />
+                                {label}
+                              </span>
+                              <span className="text-muted-foreground">{value}%</span>
+                            </div>
+                            <Slider
+                              value={[value]}
+                              onValueChange={([v]) => setFilters(prev => ({ ...prev, [key]: v }))}
+                              min={min}
+                              max={max}
+                              step={1}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Category selector */}
+                    <div className="pt-4 border-t border-border/30">
+                      <h4 className="text-sm font-medium mb-2">Filter Presets</h4>
                       <select
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value as FilterPreset['category'])}
-                        className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/30 text-sm"
+                        className="w-full px-3 py-2 rounded-lg bg-muted/50 border border-border/30 text-sm mb-3"
                       >
                         {filterCategories.map((cat) => (
                           <option key={cat} value={cat}>{categoryDisplayNames[cat]}</option>
@@ -475,7 +912,7 @@ const VideoEditor: React.FC = () => {
                           onClick={() => applyFilter(preset)}
                           className="p-2 rounded-xl bg-muted/30 hover:bg-primary/20 hover:scale-105 transition-all text-center group relative overflow-hidden border border-transparent hover:border-primary/40"
                         >
-                          <div className="w-full aspect-video rounded-lg bg-gradient-to-br from-muted via-accent/10 to-muted/50 mb-1 group-hover:scale-110 transition-transform overflow-hidden flex items-center justify-center">
+                          <div className="w-full aspect-video rounded-lg bg-gradient-to-br from-primary/40 via-accent/30 to-secondary/40 mb-1 group-hover:scale-110 transition-transform overflow-hidden flex items-center justify-center">
                             <div 
                               className="w-full h-full bg-gradient-to-br from-primary/40 via-accent/30 to-secondary/40 flex items-center justify-center text-xl"
                               style={{ filter: `brightness(${preset.brightness}%) contrast(${preset.contrast}%) saturate(${preset.saturation}%) sepia(${preset.sepia}%) grayscale(${preset.grayscale}%) hue-rotate(${preset.hue}deg)` }}
@@ -613,35 +1050,6 @@ const VideoEditor: React.FC = () => {
                         </div>
                       )}
                     </div>
-
-                    {/* Effects */}
-                    <div className="pt-4 border-t border-border/30">
-                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-primary" />
-                        Manual Adjustments
-                      </h4>
-                      <div className="space-y-3">
-                        {[
-                          { label: 'Brightness', key: 'brightness', value: filters.brightness, min: 50, max: 150 },
-                          { label: 'Contrast', key: 'contrast', value: filters.contrast, min: 50, max: 150 },
-                          { label: 'Saturation', key: 'saturation', value: filters.saturation, min: 0, max: 200 },
-                        ].map(({ label, key, value, min, max }) => (
-                          <div key={key}>
-                            <div className="flex justify-between text-xs mb-1">
-                              <span>{label}</span>
-                              <span className="text-muted-foreground">{value}%</span>
-                            </div>
-                            <Slider
-                              value={[value]}
-                              onValueChange={([v]) => setFilters(prev => ({ ...prev, [key]: v }))}
-                              min={min}
-                              max={max}
-                              step={1}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 )}
 
@@ -704,6 +1112,18 @@ const VideoEditor: React.FC = () => {
                       </div>
                     </div>
                   )}
+
+                  {/* AI Processing Overlay */}
+                  {isAiProcessing && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                      <div className="text-center">
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center mx-auto mb-3 animate-pulse">
+                          <Brain className="w-8 h-8 text-white" />
+                        </div>
+                        <p className="text-sm text-white font-medium">AI Processing...</p>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Text Overlays Display */}
                   {textOverlays.map((overlay) => (
@@ -742,7 +1162,7 @@ const VideoEditor: React.FC = () => {
                   ))}
                   
                   {/* Play/Pause overlay */}
-                  {!isPlaying && isVideoLoaded && (
+                  {!isPlaying && isVideoLoaded && !isAiProcessing && (
                     <button
                       onClick={togglePlay}
                       className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors"
@@ -832,30 +1252,24 @@ const VideoEditor: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-              </div>
 
-              {/* Video Info */}
-              <div className="mt-4 glass-card rounded-xl p-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/30 to-secondary/30 flex items-center justify-center">
-                      <Video className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium">{originalFileName}</h4>
-                      <p className="text-xs text-muted-foreground">
-                        Duration: {formatTime(duration)} • Speed: {playbackSpeed}x
-                        {videoFile && ` • Size: ${(videoFile.size / (1024 * 1024)).toFixed(1)}MB`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-1 rounded bg-primary/20 text-primary text-xs">
-                      {isVideoLoaded ? 'Ready' : 'Loading...'}
+                {/* Video Info */}
+                {isVideoLoaded && (
+                  <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Film className="w-3 h-3" />
+                      {originalFileName}
                     </span>
-                    <span className="px-2 py-1 rounded bg-secondary/20 text-secondary text-xs">100+ Filters</span>
+                    <span>Duration: {formatTime(duration)}</span>
+                    <span>Speed: {playbackSpeed}x</span>
+                    {aiDescription && (
+                      <span className="text-primary flex items-center gap-1">
+                        <Brain className="w-3 h-3" />
+                        AI Enhanced
+                      </span>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
