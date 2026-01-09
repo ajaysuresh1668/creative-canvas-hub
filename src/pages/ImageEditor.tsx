@@ -3,9 +3,9 @@ import {
   Image, Upload, Download, RotateCcw, RotateCw, FlipHorizontal, FlipVertical, 
   Sun, Contrast, Droplets, Palette, Type, Eye, Focus, ImagePlus, Smile,
   Undo2, Redo2, ZoomIn, ZoomOut,
-  Sparkles, Copy, Trash2,
-  SlidersHorizontal, Grid3X3, Frame,
-  ImageMinus, Sticker
+  Sparkles, Copy, Trash2, Wand2, Brain, Palette as PaletteIcon, User, Zap,
+  SlidersHorizontal, Grid3X3, Frame, Loader2, Send, ImageDown, Paintbrush,
+  ImageMinus, Sticker, Camera, Crop, Layers, Eraser
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import BackgroundEffects from '@/components/BackgroundEffects';
 import EditorHeader from '@/components/EditorHeader';
 import { filterPresets, filterCategories, categoryDisplayNames, type FilterPreset } from '@/lib/filterPresets';
-
+import { supabase } from '@/integrations/supabase/client';
 interface TextOverlay {
   id: string;
   text: string;
@@ -80,7 +80,7 @@ const ImageEditor: React.FC = () => {
   const [currentState, setCurrentState] = useState<HistoryState>(defaultState);
   const [history, setHistory] = useState<HistoryState[]>([defaultState]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<'adjust' | 'filters' | 'effects' | 'tools' | 'overlays' | 'face'>('adjust');
+  const [activeTab, setActiveTab] = useState<'adjust' | 'filters' | 'effects' | 'tools' | 'overlays' | 'face' | 'ai'>('adjust');
   const [zoom, setZoom] = useState(100);
   const [selectedColor, setSelectedColor] = useState('#00d4ff');
   const [showGrid, setShowGrid] = useState(false);
@@ -103,9 +103,203 @@ const ImageEditor: React.FC = () => {
   // Stickers
   const [stickers, setStickers] = useState<StickerOverlay[]>([]);
   
+  // AI Features
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiStylePrompt, setAiStylePrompt] = useState('');
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [aiDescription, setAiDescription] = useState('');
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // AI Enhancement Functions
+  const aiAutoEnhance = async () => {
+    if (!image) {
+      toast.error('Please upload an image first');
+      return;
+    }
+    
+    setIsAiProcessing(true);
+    toast.info('AI is analyzing your image...');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-image-enhance', {
+        body: { action: 'enhance', imageBase64: image }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.result && !data.result.raw) {
+        updateState({
+          brightness: data.result.brightness || currentState.brightness,
+          contrast: data.result.contrast || currentState.contrast,
+          saturation: data.result.saturation || currentState.saturation,
+          hue: data.result.hue || currentState.hue,
+          sepia: data.result.sepia || currentState.sepia,
+          warmth: data.result.warmth || currentState.warmth,
+        });
+        setAiDescription(data.result.description || 'Image enhanced!');
+        toast.success('AI enhancement applied!');
+      } else {
+        toast.info(data.result?.description || 'AI processed your image');
+      }
+    } catch (error) {
+      console.error('AI enhance error:', error);
+      toast.error('Failed to enhance image. Please try again.');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const aiStyleTransfer = async () => {
+    if (!aiStylePrompt.trim()) {
+      toast.error('Please enter a style description');
+      return;
+    }
+    
+    setIsAiProcessing(true);
+    toast.info(`Applying ${aiStylePrompt} style...`);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-image-enhance', {
+        body: { action: 'style_transfer', prompt: aiStylePrompt }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.result && !data.result.raw) {
+        updateState({
+          brightness: data.result.brightness || currentState.brightness,
+          contrast: data.result.contrast || currentState.contrast,
+          saturation: data.result.saturation || currentState.saturation,
+          hue: data.result.hue || currentState.hue,
+          sepia: data.result.sepia || currentState.sepia,
+          grayscale: data.result.grayscale || currentState.grayscale,
+        });
+        setAiDescription(data.result.description || `${aiStylePrompt} style applied!`);
+        toast.success('Style transfer complete!');
+      }
+    } catch (error) {
+      console.error('Style transfer error:', error);
+      toast.error('Failed to apply style. Please try again.');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const aiColorCorrect = async () => {
+    if (!image) {
+      toast.error('Please upload an image first');
+      return;
+    }
+    
+    setIsAiProcessing(true);
+    toast.info('AI is correcting colors...');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-image-enhance', {
+        body: { action: 'color_correction', imageBase64: image }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.result && !data.result.raw) {
+        updateState({
+          brightness: data.result.brightness || currentState.brightness,
+          contrast: data.result.contrast || currentState.contrast,
+          saturation: data.result.saturation || currentState.saturation,
+          hue: data.result.hue || currentState.hue,
+          warmth: data.result.warmth || currentState.warmth,
+        });
+        setAiDescription(data.result.description || 'Colors corrected!');
+        toast.success('Color correction applied!');
+      }
+    } catch (error) {
+      console.error('Color correction error:', error);
+      toast.error('Failed to correct colors. Please try again.');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const aiPortraitEnhance = async () => {
+    if (!image) {
+      toast.error('Please upload an image first');
+      return;
+    }
+    
+    setIsAiProcessing(true);
+    toast.info('AI is enhancing portrait...');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-image-enhance', {
+        body: { action: 'portrait_enhance', imageBase64: image }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.result && !data.result.raw) {
+        updateState({
+          smoothness: data.result.smoothness || currentState.smoothness,
+          glow: data.result.glow || currentState.glow,
+          warmth: data.result.warmth || currentState.warmth,
+          brightness: data.result.brightness || currentState.brightness,
+          contrast: data.result.contrast || currentState.contrast,
+          saturation: data.result.saturation || currentState.saturation,
+        });
+        setAiDescription(data.result.description || 'Portrait enhanced!');
+        toast.success('Portrait enhancement applied!');
+      }
+    } catch (error) {
+      console.error('Portrait enhance error:', error);
+      toast.error('Failed to enhance portrait. Please try again.');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const aiGenerateImage = async () => {
+    if (!aiPrompt.trim()) {
+      toast.error('Please enter a prompt for image generation');
+      return;
+    }
+    
+    setIsAiProcessing(true);
+    toast.info('AI is generating your image...');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-generate-image', {
+        body: { prompt: aiPrompt, action: 'generate' }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.images && data.images.length > 0) {
+        setGeneratedImage(data.images[0]);
+        toast.success('Image generated! Click to use it.');
+      } else {
+        toast.info(data.text || 'Generation complete');
+      }
+    } catch (error) {
+      console.error('AI generate error:', error);
+      toast.error('Failed to generate image. Please try again.');
+    } finally {
+      setIsAiProcessing(false);
+    }
+  };
+
+  const useGeneratedImage = () => {
+    if (generatedImage) {
+      setImage(generatedImage);
+      setGeneratedImage(null);
+      setCurrentState(defaultState);
+      setHistory([defaultState]);
+      setHistoryIndex(0);
+      toast.success('Generated image loaded!');
+    }
+  };
 
   const updateState = useCallback((updates: Partial<HistoryState>) => {
     const newState = { ...currentState, ...updates };
@@ -427,20 +621,178 @@ const ImageEditor: React.FC = () => {
               <div className="editor-sidebar rounded-2xl">
                 {/* Tabs */}
                 <div className="flex gap-1 p-1 bg-muted/30 rounded-xl mb-4 overflow-x-auto">
-                  {(['adjust', 'filters', 'overlays', 'face', 'tools'] as const).map((tab) => (
+                  {(['ai', 'adjust', 'filters', 'overlays', 'face', 'tools'] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                      className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex items-center justify-center gap-1 ${
                         activeTab === tab 
                           ? 'bg-primary text-primary-foreground' 
                           : 'hover:bg-muted/50'
                       }`}
                     >
+                      {tab === 'ai' && <Brain className="w-3 h-3" />}
                       {tab.charAt(0).toUpperCase() + tab.slice(1)}
                     </button>
                   ))}
                 </div>
+
+                {activeTab === 'ai' && (
+                  <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+                    {/* AI Auto Enhance */}
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30">
+                      <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
+                        <Wand2 className="w-4 h-4 text-primary" />
+                        AI Auto Enhance
+                      </h4>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Let AI analyze and automatically enhance your image
+                      </p>
+                      <Button 
+                        variant="glow" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={aiAutoEnhance}
+                        disabled={isAiProcessing || !image}
+                      >
+                        {isAiProcessing ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+                        ) : (
+                          <><Sparkles className="w-4 h-4 mr-2" /> Auto Enhance</>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* AI Style Transfer */}
+                    <div className="p-4 rounded-xl bg-muted/30 border border-border/30">
+                      <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
+                        <Paintbrush className="w-4 h-4 text-primary" />
+                        AI Style Transfer
+                      </h4>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Apply artistic styles like "cinematic", "vintage", "noir"
+                      </p>
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={aiStylePrompt}
+                          onChange={(e) => setAiStylePrompt(e.target.value)}
+                          placeholder="e.g., cinematic, anime, oil painting..."
+                          className="flex-1 px-3 py-2 rounded-lg bg-background/50 border border-border/30 text-sm focus:outline-none focus:border-primary/50"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {['Cinematic', 'Vintage', 'Noir', 'Anime', 'Watercolor', 'Neon'].map((style) => (
+                          <button
+                            key={style}
+                            onClick={() => setAiStylePrompt(style.toLowerCase())}
+                            className="px-2 py-1 rounded-full bg-muted/50 text-xs hover:bg-primary/20 transition-colors"
+                          >
+                            {style}
+                          </button>
+                        ))}
+                      </div>
+                      <Button 
+                        variant="glass" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={aiStyleTransfer}
+                        disabled={isAiProcessing || !aiStylePrompt.trim()}
+                      >
+                        {isAiProcessing ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Applying...</>
+                        ) : (
+                          <><PaletteIcon className="w-4 h-4 mr-2" /> Apply Style</>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Quick AI Tools */}
+                    <div className="p-4 rounded-xl bg-muted/30 border border-border/30">
+                      <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-primary" />
+                        Quick AI Tools
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button 
+                          variant="glass" 
+                          size="sm"
+                          onClick={aiColorCorrect}
+                          disabled={isAiProcessing || !image}
+                        >
+                          <Droplets className="w-4 h-4 mr-1" /> Color Fix
+                        </Button>
+                        <Button 
+                          variant="glass" 
+                          size="sm"
+                          onClick={aiPortraitEnhance}
+                          disabled={isAiProcessing || !image}
+                        >
+                          <User className="w-4 h-4 mr-1" /> Portrait
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* AI Image Generation */}
+                    <div className="p-4 rounded-xl bg-gradient-to-br from-secondary/20 to-accent/20 border border-secondary/30">
+                      <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
+                        <ImageDown className="w-4 h-4 text-secondary" />
+                        AI Image Generator
+                      </h4>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Generate new images with AI from text prompts
+                      </p>
+                      <div className="flex gap-2 mb-3">
+                        <input
+                          type="text"
+                          value={aiPrompt}
+                          onChange={(e) => setAiPrompt(e.target.value)}
+                          placeholder="Describe the image you want..."
+                          className="flex-1 px-3 py-2 rounded-lg bg-background/50 border border-border/30 text-sm focus:outline-none focus:border-secondary/50"
+                        />
+                      </div>
+                      <Button 
+                        variant="glow" 
+                        size="sm" 
+                        className="w-full bg-gradient-to-r from-secondary to-accent"
+                        onClick={aiGenerateImage}
+                        disabled={isAiProcessing || !aiPrompt.trim()}
+                      >
+                        {isAiProcessing ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+                        ) : (
+                          <><Send className="w-4 h-4 mr-2" /> Generate Image</>
+                        )}
+                      </Button>
+                      
+                      {generatedImage && (
+                        <div className="mt-3 p-2 rounded-lg bg-background/50 border border-secondary/30">
+                          <img 
+                            src={generatedImage} 
+                            alt="Generated" 
+                            className="w-full h-32 object-cover rounded-lg mb-2"
+                          />
+                          <Button 
+                            variant="glass" 
+                            size="sm" 
+                            className="w-full"
+                            onClick={useGeneratedImage}
+                          >
+                            <ImagePlus className="w-4 h-4 mr-2" /> Use This Image
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* AI Description */}
+                    {aiDescription && (
+                      <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-xs">
+                        <span className="font-medium text-primary">AI Result: </span>
+                        {aiDescription}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {activeTab === 'adjust' && (
                   <div className="space-y-4 sm:space-y-5">
